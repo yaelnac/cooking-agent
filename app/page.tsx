@@ -3,6 +3,7 @@
 import {
   ConversationProvider,
   useConversationControls,
+  useConversationMode,
   useConversationStatus,
 } from '@elevenlabs/react';
 
@@ -67,17 +68,117 @@ function HomeView() {
 }
 
 function CookingView() {
+  const { status, message } = useConversationStatus();
   const { endSession } = useConversationControls();
 
   return (
     <div className="flex min-h-screen flex-col px-5 py-6">
-      <button
-        onClick={endSession}
-        className="self-start rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-medium text-ink-soft"
-      >
-        End session
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          onClick={endSession}
+          className="rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-medium text-ink-soft"
+        >
+          End session
+        </button>
+        <ConnectionPill status={status} message={message} />
+      </div>
+
+      <VoiceOrb status={status} />
     </div>
+  );
+}
+
+function ConnectionPill({
+  status,
+  message,
+}: {
+  status: string;
+  message?: string;
+}) {
+  const tone =
+    status === 'connected'
+      ? 'bg-forest-soft text-forest'
+      : status === 'error'
+      ? 'bg-terracotta-soft text-terracotta-deep'
+      : 'bg-cream text-ink-soft border border-line';
+  const label =
+    status === 'connected'
+      ? 'Live'
+      : status === 'connecting'
+      ? 'Connecting…'
+      : status === 'error'
+      ? message || 'Trouble connecting'
+      : 'Idle';
+  return (
+    <span
+      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${tone}`}
+    >
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${
+          status === 'connected' ? 'bg-forest' : 'bg-ink-faint'
+        }`}
+      />
+      {label}
+    </span>
+  );
+}
+
+function VoiceOrb({ status }: { status: string }) {
+  const { isSpeaking, isListening } = useConversationMode();
+  const isConnecting = status === 'connecting';
+  const label = isConnecting
+    ? 'Warming up…'
+    : isSpeaking
+    ? 'Your chef is talking'
+    : isListening
+    ? 'Listening — say it'
+    : 'Standing by';
+
+  return (
+    <div className="my-6 flex flex-col items-center gap-3">
+      <div className="relative grid h-40 w-40 place-items-center">
+        {isSpeaking && (
+          <>
+            <span
+              className="absolute inset-0 rounded-full bg-terracotta/25"
+              style={{ animation: 'ring-ripple 1.6s ease-out infinite' }}
+            />
+            <span
+              className="absolute inset-0 rounded-full bg-terracotta/20"
+              style={{ animation: 'ring-ripple 1.6s ease-out 0.5s infinite' }}
+            />
+          </>
+        )}
+        {!isSpeaking && (
+          <span
+            className="absolute inset-2 rounded-full bg-terracotta/15"
+            style={{ animation: 'orb-breathe 3.2s ease-in-out infinite' }}
+          />
+        )}
+        <span className="absolute inset-6 rounded-full bg-gradient-to-br from-terracotta to-terracotta-deep shadow-[0_22px_45px_-15px_rgba(223,98,56,0.6)]" />
+        <span className="relative z-10">
+          {isListening ? <WaveBars /> : <MicIcon className="h-8 w-8 text-paper" />}
+        </span>
+      </div>
+      <p className="text-sm font-medium text-ink-soft">{label}</p>
+    </div>
+  );
+}
+
+function WaveBars() {
+  return (
+    <span className="flex h-8 items-center gap-1">
+      {[0, 1, 2, 3, 4].map((i) => (
+        <span
+          key={i}
+          className="block w-1 origin-center rounded-full bg-paper"
+          style={{
+            height: '100%',
+            animation: `wave-bar 0.9s ease-in-out ${i * 0.12}s infinite`,
+          }}
+        />
+      ))}
+    </span>
   );
 }
 
