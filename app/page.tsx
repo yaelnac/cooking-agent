@@ -4,6 +4,7 @@ import {
   ConversationProvider,
   useConversationClientTool,
   useConversationControls,
+  useConversationInput,
   useConversationMode,
   useConversationStatus,
 } from '@elevenlabs/react';
@@ -106,6 +107,7 @@ function HomeView() {
 function CookingView() {
   const { status, message } = useConversationStatus();
   const { endSession } = useConversationControls();
+  const { isMuted, setMuted } = useConversationInput();
   const [session, setSession] = useState<SessionState>(INITIAL_SESSION);
 
   useConversationClientTool('startTimer', (parameters) => {
@@ -175,13 +177,14 @@ function CookingView() {
     setSession((s) => ({ ...s, timers: s.timers.filter((t) => t.id !== id) }));
 
   return (
-    <div className="flex min-h-screen flex-col px-5 py-6">
+    <div className="flex min-h-screen flex-col px-5 pb-32 pt-6">
       <div className="flex items-center justify-between">
         <button
           onClick={endSession}
-          className="rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-medium text-ink-soft"
+          className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-medium text-ink-soft transition hover:border-ink-faint"
         >
-          End session
+          <ChevronLeftIcon className="h-3.5 w-3.5" />
+          Wrap it up
         </button>
         <ConnectionPill status={status} message={message} />
       </div>
@@ -191,6 +194,51 @@ function CookingView() {
       <StepCard step={session.step} completed={session.completed} />
       <TimerStack timers={session.timers} onDismiss={onDismissTimer} />
       <ListenHint completed={session.completed} />
+
+      <BottomBar
+        isMuted={isMuted}
+        onToggleMute={() => setMuted(!isMuted)}
+        onEnd={endSession}
+      />
+    </div>
+  );
+}
+
+function BottomBar({
+  isMuted,
+  onToggleMute,
+  onEnd,
+}: {
+  isMuted: boolean;
+  onToggleMute: () => void;
+  onEnd: () => void;
+}) {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-10">
+      <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 border-t border-line bg-paper/95 px-5 py-3 backdrop-blur">
+        <button
+          onClick={onToggleMute}
+          className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition ${
+            isMuted
+              ? 'bg-ink text-cream'
+              : 'bg-cream text-ink hover:bg-line-soft'
+          }`}
+        >
+          {isMuted ? (
+            <MicOffIcon className="h-4 w-4" />
+          ) : (
+            <MicIcon className="h-4 w-4" />
+          )}
+          {isMuted ? 'Mic off' : 'Mic on'}
+        </button>
+        <button
+          onClick={onEnd}
+          className="flex items-center gap-2 rounded-full bg-terracotta px-4 py-2.5 text-sm font-medium text-paper shadow-[0_8px_20px_-8px_rgba(223,98,56,0.6)] hover:bg-terracotta-deep"
+        >
+          End session
+          <XIcon className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -521,6 +569,33 @@ function MicIcon({ className }: { className?: string }) {
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function MicOffIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path
+        d="M9 9V6a3 3 0 0 1 6 0v3m0 3a3 3 0 0 1-5.12 2.12M5 11a7 7 0 0 0 11.95 4.95M19 11a7 7 0 0 1-.49 2.57M12 18v3M4 4l16 16"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ChevronLeftIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path
+        d="M15 6l-6 6 6 6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
