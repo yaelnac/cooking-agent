@@ -270,7 +270,7 @@ function CookingView() {
       <div className="flex items-center justify-between">
         <button
           onClick={endSession}
-          className="flex items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-medium text-ink-soft transition hover:border-ink-faint"
+          className="flex cursor-pointer items-center gap-1.5 rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-medium text-ink-soft transition hover:border-ink-faint"
         >
           <ChevronLeftIcon className="h-3.5 w-3.5" />
           Wrap it up
@@ -307,7 +307,7 @@ function BottomBar({
       <div className="mx-auto flex w-full max-w-md items-center justify-between gap-3 border-t border-line bg-paper/95 px-5 py-3 backdrop-blur">
         <button
           onClick={onToggleMute}
-          className={`flex items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition ${
+          className={`flex cursor-pointer items-center gap-2 rounded-full px-4 py-2.5 text-sm font-medium transition ${
             isMuted
               ? 'bg-ink text-cream'
               : 'bg-cream text-ink hover:bg-line-soft'
@@ -322,7 +322,7 @@ function BottomBar({
         </button>
         <button
           onClick={onEnd}
-          className="flex items-center gap-2 rounded-full bg-terracotta px-4 py-2.5 text-sm font-medium text-paper shadow-[0_8px_20px_-8px_rgba(223,98,56,0.6)] hover:bg-terracotta-deep"
+          className="flex cursor-pointer items-center gap-2 rounded-full bg-terracotta px-4 py-2.5 text-sm font-medium text-paper shadow-[0_8px_20px_-8px_rgba(223,98,56,0.6)] hover:bg-terracotta-deep"
         >
           End session
           <XIcon className="h-3.5 w-3.5" />
@@ -594,7 +594,7 @@ function TimerRow({
       <button
         onClick={onDismiss}
         aria-label="Dismiss timer"
-        className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink-faint hover:bg-line-soft"
+        className="grid h-7 w-7 shrink-0 cursor-pointer place-items-center rounded-full text-ink-faint hover:bg-line-soft"
       >
         <XIcon className="h-3.5 w-3.5" />
       </button>
@@ -652,7 +652,7 @@ function QuickPickCard({ recipe, onPick }: { recipe: Recipe; onPick: () => void 
   return (
     <button
       onClick={onPick}
-      className="group flex h-full w-full flex-col gap-3 rounded-2xl border border-line bg-paper p-4 text-left transition hover:-translate-y-0.5 hover:border-ink-faint hover:shadow-md"
+      className="group flex h-full w-full cursor-pointer flex-col gap-3 rounded-2xl border border-line bg-paper p-4 text-left transition hover:-translate-y-0.5 hover:border-ink-faint hover:shadow-md"
     >
       <div className="flex items-center justify-between">
         <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${accent.chip}`}>
@@ -739,7 +739,7 @@ function CategoryTabs({
           <button
             key={c}
             onClick={() => onChange(c)}
-            className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+            className={`flex shrink-0 cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
               isActive
                 ? 'bg-ink text-cream shadow-sm'
                 : 'text-ink-soft hover:bg-cream'
@@ -765,7 +765,7 @@ function RecipeCard({ recipe, onPick }: { recipe: Recipe; onPick: () => void }) 
   return (
     <button
       onClick={onPick}
-      className="group relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-line bg-paper text-left transition hover:-translate-y-0.5 hover:border-ink-faint hover:shadow-[0_20px_40px_-25px_rgba(26,20,16,0.3)]"
+      className="group relative flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-3xl border border-line bg-paper text-left transition hover:-translate-y-0.5 hover:border-ink-faint hover:shadow-[0_20px_40px_-25px_rgba(26,20,16,0.3)]"
     >
       <div className={`h-1.5 w-full ${accent.bar}`} />
       <div className="flex flex-1 flex-col gap-3 p-5">
@@ -830,7 +830,7 @@ function IdleOrb({ onTap, loading }: { onTap: () => void; loading: boolean }) {
       onClick={onTap}
       disabled={loading}
       aria-label="Start cooking with voice"
-      className="relative z-10 grid h-44 w-44 place-items-center disabled:cursor-wait md:h-52 md:w-52"
+      className="relative z-10 grid h-44 w-44 place-items-center enabled:cursor-pointer disabled:cursor-wait md:h-52 md:w-52"
     >
       <span
         className="absolute inset-0 rounded-full bg-terracotta/15"
