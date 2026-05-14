@@ -79,3 +79,9 @@ button:disabled,
 }
 
 .anim-fade-up { animation: fade-up 320ms ease-out both; }
+
+@keyframes hint-cycle {
+  0% { opacity: 0; transform: translateY(4px); }
+  15%, 85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
