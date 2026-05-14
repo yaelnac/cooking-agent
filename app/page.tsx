@@ -2,12 +2,48 @@
 
 import {
   ConversationProvider,
+  useConversationClientTool,
   useConversationControls,
   useConversationMode,
   useConversationStatus,
 } from '@elevenlabs/react';
+import { useEffect, useState } from 'react';
 
 const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
+
+type CookingTimer = {
+  id: string;
+  label: string;
+  totalSeconds: number;
+  secondsLeft: number;
+  isDone: boolean;
+};
+
+type ActiveRecipe = {
+  name: string;
+  caloriesLabel?: string;
+  proteinLabel?: string;
+};
+
+type CurrentStep = {
+  index: number;
+  total: number;
+  text: string;
+};
+
+type SessionState = {
+  timers: CookingTimer[];
+  step: CurrentStep | null;
+  recipe: ActiveRecipe | null;
+  completed: boolean;
+};
+
+const INITIAL_SESSION: SessionState = {
+  timers: [],
+  step: null,
+  recipe: null,
+  completed: false,
+};
 
 export default function Page() {
   return (
@@ -70,6 +106,73 @@ function HomeView() {
 function CookingView() {
   const { status, message } = useConversationStatus();
   const { endSession } = useConversationControls();
+  const [session, setSession] = useState<SessionState>(INITIAL_SESSION);
+
+  useConversationClientTool('startTimer', (parameters) => {
+    const { seconds, label } = parameters as { seconds: number; label: string };
+    const id = `${label}-${Date.now()}`;
+    setSession((s) => ({
+      ...s,
+      timers: [
+        ...s.timers.filter((t) => !t.isDone),
+        { id, label, totalSeconds: seconds, secondsLeft: seconds, isDone: false },
+      ],
+    }));
+    return `Started ${label} for ${seconds}s.`;
+  });
+
+  useConversationClientTool('setCurrentStep', (parameters) => {
+    const { index, total, text } = parameters as {
+      index: number;
+      total: number;
+      text: string;
+    };
+    setSession((s) => ({ ...s, step: { index, total, text }, completed: false }));
+    return `Step ${index}/${total} shown.`;
+  });
+
+  useConversationClientTool('setActiveRecipe', (parameters) => {
+    const { name, calories, protein } = parameters as {
+      name: string;
+      calories?: string;
+      protein?: string;
+    };
+    setSession((s) => ({
+      ...s,
+      recipe: { name, caloriesLabel: calories, proteinLabel: protein },
+      step: null,
+      completed: false,
+    }));
+    return `Recipe set: ${name}`;
+  });
+
+  useConversationClientTool('completeRecipe', () => {
+    setSession((s) => ({ ...s, completed: true }));
+    return 'Marked complete.';
+  });
+
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setSession((s) => {
+        if (s.timers.length === 0) return s;
+        let changed = false;
+        const next = s.timers.map((t) => {
+          if (t.isDone) return t;
+          if (t.secondsLeft <= 1) {
+            changed = true;
+            return { ...t, secondsLeft: 0, isDone: true };
+          }
+          changed = true;
+          return { ...t, secondsLeft: t.secondsLeft - 1 };
+        });
+        return changed ? { ...s, timers: next } : s;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  const onDismissTimer = (id: string) =>
+    setSession((s) => ({ ...s, timers: s.timers.filter((t) => t.id !== id) }));
 
   return (
     <div className="flex min-h-screen flex-col px-5 py-6">
@@ -83,7 +186,11 @@ function CookingView() {
         <ConnectionPill status={status} message={message} />
       </div>
 
+      <RecipeHeader recipe={session.recipe} />
       <VoiceOrb status={status} />
+      <StepCard step={session.step} completed={session.completed} />
+      <TimerStack timers={session.timers} onDismiss={onDismissTimer} />
+      <ListenHint completed={session.completed} />
     </div>
   );
 }
@@ -120,6 +227,45 @@ function ConnectionPill({
       />
       {label}
     </span>
+  );
+}
+
+function RecipeHeader({ recipe }: { recipe: ActiveRecipe | null }) {
+  if (!recipe) {
+    return (
+      <div className="mt-5 flex flex-col gap-1">
+        <span className="text-[11px] uppercase tracking-[0.18em] text-ink-faint">
+          Cooking together
+        </span>
+        <h2 className="font-display text-2xl leading-tight tracking-tight text-ink">
+          Tell your chef what to make.
+        </h2>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-5 flex flex-col gap-2">
+      <span className="text-[11px] uppercase tracking-[0.18em] text-ink-faint">
+        Now cooking
+      </span>
+      <h2 className="font-display text-[26px] leading-[1.1] tracking-tight">
+        {recipe.name}
+      </h2>
+      {(recipe.proteinLabel || recipe.caloriesLabel) && (
+        <div className="flex flex-wrap gap-1.5">
+          {recipe.proteinLabel && (
+            <span className="rounded-full bg-forest-soft px-2.5 py-1 text-[11px] font-medium text-forest">
+              {recipe.proteinLabel} protein
+            </span>
+          )}
+          {recipe.caloriesLabel && (
+            <span className="rounded-full bg-butter px-2.5 py-1 text-[11px] font-medium text-ink">
+              {recipe.caloriesLabel} kcal
+            </span>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -182,6 +328,153 @@ function WaveBars() {
   );
 }
 
+function StepCard({
+  step,
+  completed,
+}: {
+  step: CurrentStep | null;
+  completed: boolean;
+}) {
+  if (completed) {
+    return (
+      <div className="anim-fade-up mt-2 flex flex-col items-center gap-2 rounded-3xl border border-forest/20 bg-forest-soft p-6 text-center">
+        <span className="grid h-10 w-10 place-items-center rounded-full bg-forest text-paper">
+          <CheckIcon className="h-5 w-5" />
+        </span>
+        <h3 className="font-display text-xl tracking-tight text-forest">
+          Plated. Nicely done.
+        </h3>
+        <p className="text-sm text-forest/80">Eat first. Dishes later.</p>
+      </div>
+    );
+  }
+
+  if (!step) {
+    return (
+      <div className="mt-2 rounded-3xl border border-dashed border-line bg-paper/60 p-6 text-center">
+        <p className="text-sm text-ink-faint">
+          Say a recipe out loud — or pick one before starting next time.
+        </p>
+      </div>
+    );
+  }
+
+  const progress = Math.min(1, step.index / step.total);
+
+  return (
+    <div className="anim-fade-up mt-2 flex flex-col gap-4 rounded-3xl border border-line bg-paper p-5 shadow-[0_4px_18px_-8px_rgba(26,20,16,0.08)]">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-terracotta">
+          Step {step.index} <span className="text-ink-faint">/ {step.total}</span>
+        </span>
+        <span className="text-[11px] text-ink-faint">
+          {Math.round(progress * 100)}%
+        </span>
+      </div>
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-line-soft">
+        <div
+          className="h-full rounded-full bg-terracotta transition-[width] duration-500"
+          style={{ width: `${progress * 100}%` }}
+        />
+      </div>
+      <p className="font-display text-[22px] leading-snug tracking-tight">
+        {step.text}
+      </p>
+    </div>
+  );
+}
+
+function TimerStack({
+  timers,
+  onDismiss,
+}: {
+  timers: CookingTimer[];
+  onDismiss: (id: string) => void;
+}) {
+  if (timers.length === 0) return null;
+
+  const sorted = [...timers].sort((a, b) => {
+    if (a.isDone !== b.isDone) return a.isDone ? -1 : 1;
+    return a.secondsLeft - b.secondsLeft;
+  });
+
+  return (
+    <div className="mt-5 flex flex-col gap-2">
+      <div className="flex items-center justify-between">
+        <span className="text-[11px] uppercase tracking-[0.18em] text-ink-faint">
+          Timers
+        </span>
+        <span className="text-[11px] text-ink-faint">
+          {timers.filter((t) => !t.isDone).length} running
+        </span>
+      </div>
+      <ul className="flex flex-col gap-2">
+        {sorted.map((t) => (
+          <li key={t.id}>
+            <TimerRow timer={t} onDismiss={() => onDismiss(t.id)} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function TimerRow({
+  timer,
+  onDismiss,
+}: {
+  timer: CookingTimer;
+  onDismiss: () => void;
+}) {
+  const ratio = timer.totalSeconds
+    ? 1 - timer.secondsLeft / timer.totalSeconds
+    : 0;
+
+  return (
+    <div
+      className={`anim-fade-up flex items-center justify-between gap-3 rounded-2xl border p-3 ${
+        timer.isDone
+          ? 'border-butter-deep/40 bg-butter/60'
+          : 'border-line bg-paper'
+      }`}
+    >
+      <div className="flex flex-1 flex-col gap-1.5">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium text-ink">{timer.label}</span>
+          <span className="font-mono text-base tabular-nums text-ink">
+            {timer.isDone ? 'Ding!' : formatSeconds(timer.secondsLeft)}
+          </span>
+        </div>
+        <div className="h-1 w-full overflow-hidden rounded-full bg-line-soft">
+          <div
+            className={`h-full rounded-full ${
+              timer.isDone ? 'bg-butter-deep' : 'bg-terracotta'
+            }`}
+            style={{ width: `${Math.min(1, ratio) * 100}%` }}
+          />
+        </div>
+      </div>
+      <button
+        onClick={onDismiss}
+        aria-label="Dismiss timer"
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-ink-faint hover:bg-line-soft"
+      >
+        <XIcon className="h-3.5 w-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function ListenHint({ completed }: { completed: boolean }) {
+  if (completed) return null;
+  return (
+    <p className="mt-6 text-center text-xs text-ink-faint">
+      Say <span className="font-semibold text-ink">“done”</span> to move on ·{' '}
+      Say <span className="font-semibold text-ink">“repeat”</span> to hear it again
+    </p>
+  );
+}
+
 function IdleOrb({ onTap, loading }: { onTap: () => void; loading: boolean }) {
   return (
     <button
@@ -210,6 +503,12 @@ function IdleOrb({ onTap, loading }: { onTap: () => void; loading: boolean }) {
   );
 }
 
+function formatSeconds(total: number) {
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
 function MicIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
@@ -222,6 +521,33 @@ function MicIcon({ className }: { className?: string }) {
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path
+        d="M6 6l12 12M18 6 6 18"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function CheckIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path
+        d="m5 12 5 5 9-11"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
