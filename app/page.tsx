@@ -1,65 +1,127 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import {
+  ConversationProvider,
+  useConversationControls,
+  useConversationStatus,
+} from '@elevenlabs/react';
+
+const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
+
+export default function Page() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <ConversationProvider>
+      <App />
+    </ConversationProvider>
+  );
+}
+
+function App() {
+  const { status } = useConversationStatus();
+  const isCooking = status === 'connected' || status === 'connecting';
+
+  return (
+    <main className="flex w-full flex-1 flex-col">
+      {isCooking ? (
+        <div className="mx-auto w-full max-w-md">
+          <CookingView />
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      ) : (
+        <HomeView />
+      )}
+    </main>
+  );
+}
+
+function HomeView() {
+  const { startSession } = useConversationControls();
+  const { status } = useConversationStatus();
+
+  async function handleStart() {
+    if (!agentId) {
+      alert('Missing NEXT_PUBLIC_ELEVENLABS_AGENT_ID');
+      return;
+    }
+    await navigator.mediaDevices.getUserMedia({ audio: true });
+    startSession({ agentId, connectionType: 'websocket' });
+  }
+
+  return (
+    <section className="relative overflow-hidden">
+      <div className="relative mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-5 py-16 text-center">
+        <h1 className="font-display text-[26px] leading-tight tracking-tight md:text-[34px]">
+          Tap. Talk.{' '}
+          <span className="italic text-terracotta">Cook.</span>
+        </h1>
+
+        <IdleOrb onTap={handleStart} loading={status === 'connecting'} />
+
+        <p className="text-sm text-ink-faint">
+          {status === 'connecting'
+            ? 'Warming up the kitchen…'
+            : 'Tap to start.'}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function CookingView() {
+  const { endSession } = useConversationControls();
+
+  return (
+    <div className="flex min-h-screen flex-col px-5 py-6">
+      <button
+        onClick={endSession}
+        className="self-start rounded-full border border-line bg-paper px-3 py-1.5 text-xs font-medium text-ink-soft"
+      >
+        End session
+      </button>
     </div>
+  );
+}
+
+function IdleOrb({ onTap, loading }: { onTap: () => void; loading: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      disabled={loading}
+      aria-label="Start cooking with voice"
+      className="relative z-10 grid h-44 w-44 place-items-center disabled:cursor-wait md:h-52 md:w-52"
+    >
+      <span
+        className="absolute inset-0 rounded-full bg-terracotta/15"
+        style={{ animation: 'orb-breathe 3.6s ease-in-out infinite' }}
+      />
+      <span
+        className="absolute inset-3 rounded-full bg-terracotta/25"
+        style={{ animation: 'orb-pulse 2.4s ease-in-out infinite' }}
+      />
+      <span className="absolute inset-7 rounded-full bg-gradient-to-br from-terracotta to-terracotta-deep shadow-[0_18px_40px_-12px_rgba(223,98,56,0.55)]" />
+      <span className="relative z-10 flex flex-col items-center gap-1 text-paper">
+        <MicIcon className="h-7 w-7" />
+        <span className="text-[13px] font-medium tracking-wide">
+          {loading ? 'Connecting…' : 'Tap to cook'}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function MicIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path
+        d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3Z"
+        fill="currentColor"
+      />
+      <path
+        d="M5 11a7 7 0 0 0 14 0M12 18v3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
   );
 }
