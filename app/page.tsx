@@ -125,23 +125,7 @@ function HomeView() {
 
   return (
     <div className="flex flex-col">
-      <section className="relative overflow-hidden">
-        <div className="relative mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-5 py-12 text-center md:py-16">
-          <h1 className="font-display text-[26px] leading-tight tracking-tight md:text-[34px]">
-            Tap. Talk.{' '}
-            <span className="italic text-terracotta">Cook.</span>
-          </h1>
-
-          <IdleOrb onTap={() => handleStart()} loading={status === 'connecting'} />
-
-          <p className="text-sm text-ink-faint">
-            {status === 'connecting'
-              ? 'Warming up the kitchen…'
-              : 'or pick something below.'}
-          </p>
-        </div>
-      </section>
-
+      <Hero onTap={() => handleStart()} status={status} />
       <QuickPicks recipes={quickPicks} onPick={handleStart} />
       <BrowseAll
         category={category}
@@ -151,6 +135,61 @@ function HomeView() {
         onPick={handleStart}
       />
     </div>
+  );
+}
+
+function todayLabel(date: Date) {
+  return date.toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+  });
+}
+
+function Hero({ onTap, status }: { onTap: () => void; status: string }) {
+  const isConnecting = status === 'connecting';
+  const [dateLabel, setDateLabel] = useState('');
+
+  useEffect(() => {
+    // post-mount sync of user-local time; can't run during SSR without hydration mismatch
+    /* eslint-disable-next-line react-hooks/set-state-in-effect */
+    setDateLabel(todayLabel(new Date()));
+  }, []);
+
+  return (
+    <section className="relative overflow-hidden">
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-1/2 top-[55%] -z-0 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-butter/55 blur-3xl"
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute left-[28%] top-[70%] -z-0 h-56 w-56 -translate-x-1/2 rounded-full bg-terracotta/12 blur-3xl"
+      />
+      <span
+        aria-hidden
+        className="pointer-events-none absolute right-[24%] top-[30%] -z-0 h-48 w-48 rounded-full bg-forest/10 blur-3xl"
+      />
+
+      <div className="relative mx-auto flex w-full max-w-3xl flex-col items-center gap-5 px-5 py-12 text-center md:gap-6 md:py-16">
+        <span className="min-h-[1em] text-[11px] uppercase tracking-[0.18em] text-ink-faint">
+          {dateLabel}
+        </span>
+
+        <h1 className="font-display text-[26px] leading-tight tracking-tight md:text-[34px]">
+          Tap. Talk.{' '}
+          <span className="italic text-terracotta">Cook.</span>
+        </h1>
+
+        <IdleOrb onTap={onTap} loading={isConnecting} />
+
+        <p className="text-sm text-ink-faint">
+          {isConnecting
+            ? 'Warming up the kitchen…'
+            : 'or pick something below.'}
+        </p>
+      </div>
+    </section>
   );
 }
 
