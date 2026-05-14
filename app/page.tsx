@@ -8,7 +8,8 @@ import {
   useConversationMode,
   useConversationStatus,
 } from '@elevenlabs/react';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { CATEGORIES, type Recipe, type RecipeCategory, RECIPES } from './recipes';
 
 const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
 
@@ -72,35 +73,84 @@ function App() {
 }
 
 function HomeView() {
+  const [category, setCategory] = useState<RecipeCategory>('Breakfast');
   const { startSession } = useConversationControls();
   const { status } = useConversationStatus();
 
-  async function handleStart() {
-    if (!agentId) {
-      alert('Missing NEXT_PUBLIC_ELEVENLABS_AGENT_ID');
-      return;
-    }
-    await navigator.mediaDevices.getUserMedia({ audio: true });
-    startSession({ agentId, connectionType: 'websocket' });
-  }
+  const filtered = useMemo(
+    () => RECIPES.filter((r) => r.category === category),
+    [category],
+  );
+
+  const quickPicks = useMemo(
+    () => RECIPES.filter((r) => r.minutes <= 5).slice(0, 6),
+    [],
+  );
+
+  const counts = useMemo(() => {
+    const map: Record<RecipeCategory, number> = {
+      Breakfast: 0, Lunch: 0, Dinner: 0, Snacks: 0,
+    };
+    for (const r of RECIPES) map[r.category]++;
+    return map;
+  }, []);
+
+  const handleStart = useCallback(
+    async (recipe?: Recipe) => {
+      if (!agentId) {
+        alert('Missing NEXT_PUBLIC_ELEVENLABS_AGENT_ID');
+        return;
+      }
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+      const overrides = recipe
+        ? {
+            conversationConfigOverride: {
+              agent: {
+                firstMessage: `Let's make ${recipe.name}. Ready when you are.`,
+                prompt: {
+                  prompt: `The user just selected the recipe "${recipe.name}" (${recipe.category}). Macros: ${recipe.calories[0]}-${recipe.calories[1]} kcal, ${recipe.protein[0]}-${recipe.protein[1]}g protein. Walk them through it one step at a time, wait for "done", and call client tools setActiveRecipe, setCurrentStep, startTimer, and completeRecipe to drive the screen.`,
+                },
+              },
+            },
+          }
+        : undefined;
+      startSession({
+        agentId,
+        connectionType: 'websocket',
+        ...overrides,
+      });
+    },
+    [startSession],
+  );
 
   return (
-    <section className="relative overflow-hidden">
-      <div className="relative mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-5 py-16 text-center">
-        <h1 className="font-display text-[26px] leading-tight tracking-tight md:text-[34px]">
-          Tap. Talk.{' '}
-          <span className="italic text-terracotta">Cook.</span>
-        </h1>
+    <div className="flex flex-col">
+      <section className="relative overflow-hidden">
+        <div className="relative mx-auto flex w-full max-w-3xl flex-col items-center gap-6 px-5 py-12 text-center md:py-16">
+          <h1 className="font-display text-[26px] leading-tight tracking-tight md:text-[34px]">
+            Tap. Talk.{' '}
+            <span className="italic text-terracotta">Cook.</span>
+          </h1>
 
-        <IdleOrb onTap={handleStart} loading={status === 'connecting'} />
+          <IdleOrb onTap={() => handleStart()} loading={status === 'connecting'} />
 
-        <p className="text-sm text-ink-faint">
-          {status === 'connecting'
-            ? 'Warming up the kitchen…'
-            : 'Tap to start.'}
-        </p>
-      </div>
-    </section>
+          <p className="text-sm text-ink-faint">
+            {status === 'connecting'
+              ? 'Warming up the kitchen…'
+              : 'or pick something below.'}
+          </p>
+        </div>
+      </section>
+
+      <QuickPicks recipes={quickPicks} onPick={handleStart} />
+      <BrowseAll
+        category={category}
+        counts={counts}
+        recipes={filtered}
+        onChangeCategory={setCategory}
+        onPick={handleStart}
+      />
+    </div>
   );
 }
 
@@ -523,6 +573,217 @@ function ListenHint({ completed }: { completed: boolean }) {
   );
 }
 
+function QuickPicks({
+  recipes,
+  onPick,
+}: {
+  recipes: Recipe[];
+  onPick: (r: Recipe) => void;
+}) {
+  return (
+    <section>
+      <div className="mx-auto w-full max-w-6xl px-5 pb-10 pt-2 md:px-8 md:pb-14">
+        <div className="mb-5 flex items-baseline justify-between gap-4">
+          <h2 className="font-display text-xl tracking-tight md:text-2xl">
+            Need it <span className="italic text-terracotta">fast</span>?
+          </h2>
+          <span className="text-[11px] uppercase tracking-[0.18em] text-ink-faint">
+            Under 5 min
+          </span>
+        </div>
+
+        <div className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 md:mx-0 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 lg:grid-cols-6">
+          {recipes.map((r, i) => (
+            <div
+              key={r.slug}
+              className="anim-fade-up w-[78%] min-w-[78%] snap-start md:w-auto md:min-w-0"
+              style={{ animationDelay: `${i * 30}ms` }}
+            >
+              <QuickPickCard recipe={r} onPick={() => onPick(r)} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function QuickPickCard({ recipe, onPick }: { recipe: Recipe; onPick: () => void }) {
+  const accent = categoryAccent(recipe.category);
+  return (
+    <button
+      onClick={onPick}
+      className="group flex h-full w-full flex-col gap-3 rounded-2xl border border-line bg-paper p-4 text-left transition hover:-translate-y-0.5 hover:border-ink-faint hover:shadow-md"
+    >
+      <div className="flex items-center justify-between">
+        <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${accent.chip}`}>
+          {recipe.category}
+        </span>
+        <span className="font-mono text-[11px] text-ink-faint">
+          ~{recipe.minutes}m
+        </span>
+      </div>
+      <h3 className="font-display text-lg leading-tight tracking-tight">
+        {recipe.name}
+      </h3>
+      <p className="flex-1 text-sm text-ink-soft">{recipe.angle}</p>
+      <div className="flex items-end justify-between">
+        <span className="font-display text-2xl tracking-tight text-forest">
+          {recipe.protein[0]}&ndash;{recipe.protein[1]}
+          <span className="ml-1 text-xs font-medium text-forest/70">g protein</span>
+        </span>
+        <span className="grid h-7 w-7 place-items-center rounded-full bg-cream text-ink transition group-hover:bg-terracotta group-hover:text-paper">
+          <ArrowIcon className="h-3.5 w-3.5" />
+        </span>
+      </div>
+    </button>
+  );
+}
+
+function BrowseAll({
+  category,
+  counts,
+  recipes,
+  onChangeCategory,
+  onPick,
+}: {
+  category: RecipeCategory;
+  counts: Record<RecipeCategory, number>;
+  recipes: Recipe[];
+  onChangeCategory: (c: RecipeCategory) => void;
+  onPick: (r: Recipe) => void;
+}) {
+  return (
+    <section id="browse">
+      <div className="mx-auto w-full max-w-6xl px-5 pb-16 pt-2 md:px-8 md:pb-20">
+        <div className="mb-5 flex items-baseline justify-between gap-4">
+          <h2 className="font-display text-2xl tracking-tight md:text-3xl">
+            Your <span className="italic">menu</span>.
+          </h2>
+          <span className="text-[11px] uppercase tracking-[0.18em] text-ink-faint">
+            {Object.values(counts).reduce((a, b) => a + b, 0)} recipes
+          </span>
+        </div>
+
+        <CategoryTabs active={category} counts={counts} onChange={onChangeCategory} />
+
+        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {recipes.map((r, i) => (
+            <div
+              key={r.slug}
+              className="anim-fade-up"
+              style={{ animationDelay: `${i * 20}ms` }}
+            >
+              <RecipeCard recipe={r} onPick={() => onPick(r)} />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CategoryTabs({
+  active,
+  counts,
+  onChange,
+}: {
+  active: RecipeCategory;
+  counts: Record<RecipeCategory, number>;
+  onChange: (c: RecipeCategory) => void;
+}) {
+  return (
+    <div className="flex w-full gap-1 overflow-x-auto rounded-full border border-line bg-paper p-1 md:w-fit">
+      {CATEGORIES.map((c) => {
+        const isActive = c === active;
+        return (
+          <button
+            key={c}
+            onClick={() => onChange(c)}
+            className={`flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition ${
+              isActive
+                ? 'bg-ink text-cream shadow-sm'
+                : 'text-ink-soft hover:bg-cream'
+            }`}
+          >
+            {c}
+            <span
+              className={`rounded-full px-1.5 text-[10px] font-semibold ${
+                isActive ? 'bg-cream/20 text-cream' : 'bg-cream text-ink-faint'
+              }`}
+            >
+              {counts[c]}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function RecipeCard({ recipe, onPick }: { recipe: Recipe; onPick: () => void }) {
+  const accent = categoryAccent(recipe.category);
+  return (
+    <button
+      onClick={onPick}
+      className="group relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-line bg-paper text-left transition hover:-translate-y-0.5 hover:border-ink-faint hover:shadow-[0_20px_40px_-25px_rgba(26,20,16,0.3)]"
+    >
+      <div className={`h-1.5 w-full ${accent.bar}`} />
+      <div className="flex flex-1 flex-col gap-3 p-5">
+        <div className="flex items-center justify-between">
+          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${accent.chip}`}>
+            {recipe.category}
+          </span>
+          <span className="font-mono text-[11px] text-ink-faint">
+            ~{recipe.minutes} min
+          </span>
+        </div>
+
+        <h3 className="font-display text-xl leading-tight tracking-tight">
+          {recipe.name}
+        </h3>
+        <p className="text-sm italic text-ink-soft">&ldquo;{recipe.angle}.&rdquo;</p>
+
+        <div className="mt-auto flex items-end justify-between gap-3 border-t border-line pt-4">
+          <div className="flex flex-col">
+            <span className="text-[10px] uppercase tracking-wide text-ink-faint">
+              Protein
+            </span>
+            <span className="font-display text-2xl leading-none tracking-tight text-forest">
+              {recipe.protein[0]}&ndash;{recipe.protein[1]}
+              <span className="ml-0.5 text-xs font-medium text-forest/70">g</span>
+            </span>
+          </div>
+          <div className="flex flex-col text-right">
+            <span className="text-[10px] uppercase tracking-wide text-ink-faint">
+              kcal
+            </span>
+            <span className="font-display text-2xl leading-none tracking-tight text-ink">
+              {recipe.calories[0]}&ndash;{recipe.calories[1]}
+            </span>
+          </div>
+          <span className="grid h-9 w-9 shrink-0 place-items-center self-center rounded-full bg-cream text-ink transition group-hover:bg-terracotta group-hover:text-paper">
+            <ArrowIcon className="h-4 w-4" />
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function categoryAccent(c: RecipeCategory) {
+  switch (c) {
+    case 'Breakfast':
+      return { bar: 'bg-butter-deep', chip: 'bg-butter text-ink' };
+    case 'Lunch':
+      return { bar: 'bg-forest', chip: 'bg-forest-soft text-forest' };
+    case 'Dinner':
+      return { bar: 'bg-terracotta', chip: 'bg-terracotta-soft text-terracotta-deep' };
+    case 'Snacks':
+      return { bar: 'bg-ink', chip: 'bg-cream text-ink border border-line' };
+  }
+}
+
 function IdleOrb({ onTap, loading }: { onTap: () => void; loading: boolean }) {
   return (
     <button
@@ -582,6 +843,20 @@ function MicOffIcon({ className }: { className?: string }) {
         stroke="currentColor"
         strokeWidth="1.8"
         strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function ArrowIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path
+        d="M5 12h14M13 6l6 6-6 6"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
