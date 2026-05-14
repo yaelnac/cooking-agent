@@ -8,7 +8,7 @@ import {
   useConversationMode,
   useConversationStatus,
 } from '@elevenlabs/react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CATEGORIES, type Recipe, type RecipeCategory, RECIPES } from './recipes';
 
 const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
@@ -57,7 +57,46 @@ export default function Page() {
 
 function App() {
   const { status } = useConversationStatus();
+  const { endSession } = useConversationControls();
   const isCooking = status === 'connected' || status === 'connecting';
+  const prevIsCookingRef = useRef(false);
+
+  // Strip a stale ?cooking=1 if the page is loaded fresh without a session.
+  useEffect(() => {
+    if (window.location.search.includes('cooking')) {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  // Sync URL with cooking state on transitions.
+  useEffect(() => {
+    const wasCooking = prevIsCookingRef.current;
+    prevIsCookingRef.current = isCooking;
+
+    if (!wasCooking && isCooking) {
+      if (!window.location.search.includes('cooking')) {
+        window.history.pushState({ cooking: true }, '', '?cooking=1');
+      }
+    } else if (wasCooking && !isCooking) {
+      if (window.location.search.includes('cooking')) {
+        window.history.back();
+      }
+    }
+  }, [isCooking]);
+
+  // Browser back button while cooking → end the session.
+  useEffect(() => {
+    const onPopState = () => {
+      if (
+        !window.location.search.includes('cooking') &&
+        (status === 'connected' || status === 'connecting')
+      ) {
+        endSession();
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [status, endSession]);
 
   return (
     <main className="flex w-full flex-1 flex-col">
@@ -83,7 +122,7 @@ function HomeView() {
   );
 
   const quickPicks = useMemo(
-    () => RECIPES.filter((r) => r.minutes <= 5).slice(0, 6),
+    () => RECIPES.filter((r) => r.minutes <= 5).slice(0, 5),
     [],
   );
 
@@ -127,6 +166,9 @@ function HomeView() {
     <div className="flex flex-col">
       <Hero onTap={() => handleStart()} status={status} />
       <QuickPicks recipes={quickPicks} onPick={handleStart} />
+      <div className="mx-auto w-full max-w-6xl px-5 md:px-8">
+        <WaveDivider className="mx-auto h-2.5 w-full max-w-md text-line opacity-70" />
+      </div>
       <BrowseAll
         category={category}
         counts={counts}
@@ -138,23 +180,8 @@ function HomeView() {
   );
 }
 
-function todayLabel(date: Date) {
-  return date.toLocaleDateString(undefined, {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-  });
-}
-
 function Hero({ onTap, status }: { onTap: () => void; status: string }) {
   const isConnecting = status === 'connecting';
-  const [dateLabel, setDateLabel] = useState('');
-
-  useEffect(() => {
-    // post-mount sync of user-local time; can't run during SSR without hydration mismatch
-    /* eslint-disable-next-line react-hooks/set-state-in-effect */
-    setDateLabel(todayLabel(new Date()));
-  }, []);
 
   return (
     <section className="relative overflow-hidden">
@@ -172,22 +199,25 @@ function Hero({ onTap, status }: { onTap: () => void; status: string }) {
       />
 
       <div className="relative mx-auto flex w-full max-w-3xl flex-col items-center gap-5 px-5 py-12 text-center md:gap-6 md:py-16">
-        <span className="min-h-[1em] text-[11px] uppercase tracking-[0.18em] text-ink-faint">
-          {dateLabel}
-        </span>
-
         <h1 className="font-display text-[26px] leading-tight tracking-tight md:text-[34px]">
           Tap. Talk.{' '}
-          <span className="italic text-terracotta">Cook.</span>
+          <span className="relative inline-block italic text-terracotta">
+            Cook.
+          </span>
         </h1>
 
         <IdleOrb onTap={onTap} loading={isConnecting} />
 
-        <p className="text-sm text-ink-faint">
-          {isConnecting
-            ? 'Warming up the kitchen…'
-            : 'or pick something below.'}
-        </p>
+        {isConnecting ? (
+          <p className="text-sm text-ink-faint">Getting ready…</p>
+        ) : (
+          <p className="text-sm text-ink-faint">
+            try{' '}
+            <span className="font-display italic text-ink-soft">
+              “walk me through chicken rice”
+            </span>
+          </p>
+        )}
       </div>
     </section>
   );
@@ -280,7 +310,7 @@ function CookingView() {
 
       <RecipeHeader recipe={session.recipe} />
       <VoiceOrb status={status} />
-      <StepCard step={session.step} completed={session.completed} />
+      <StepCard step={session.step} completed={session.completed} recipe={session.recipe} />
       <TimerStack timers={session.timers} onDismiss={onDismissTimer} />
       <ListenHint completed={session.completed} />
 
@@ -375,7 +405,7 @@ function RecipeHeader({ recipe }: { recipe: ActiveRecipe | null }) {
           Cooking together
         </span>
         <h2 className="font-display text-2xl leading-tight tracking-tight text-ink">
-          Tell your chef what to make.
+          Tell me what to make.
         </h2>
       </div>
     );
@@ -412,10 +442,10 @@ function VoiceOrb({ status }: { status: string }) {
   const label = isConnecting
     ? 'Warming up…'
     : isSpeaking
-    ? 'Your chef is talking'
+    ? 'Hang on, I’ve got this.'
     : isListening
-    ? 'Listening — say it'
-    : 'Standing by';
+    ? 'I’m listening.'
+    : 'I’m here when you are.';
 
   return (
     <div className="my-6 flex flex-col items-center gap-3">
@@ -468,9 +498,11 @@ function WaveBars() {
 function StepCard({
   step,
   completed,
+  recipe,
 }: {
   step: CurrentStep | null;
   completed: boolean;
+  recipe: ActiveRecipe | null;
 }) {
   if (completed) {
     return (
@@ -479,9 +511,13 @@ function StepCard({
           <CheckIcon className="h-5 w-5" />
         </span>
         <h3 className="font-display text-xl tracking-tight text-forest">
-          Plated. Nicely done.
+          We did it.
         </h3>
-        <p className="text-sm text-forest/80">Eat first. Dishes later.</p>
+        <p className="text-sm text-forest/80">
+          {recipe?.proteinLabel
+            ? `${recipe.proteinLabel} of protein in the bag — you’re welcome.`
+            : 'Eat first. Dishes later.'}
+        </p>
       </div>
     );
   }
@@ -489,8 +525,8 @@ function StepCard({
   if (!step) {
     return (
       <div className="mt-2 rounded-3xl border border-dashed border-line bg-paper/60 p-6 text-center">
-        <p className="text-sm text-ink-faint">
-          Say a recipe out loud — or pick one before starting next time.
+        <p className="text-sm italic text-ink-faint">
+          “Tell me what to make.”
         </p>
       </div>
     );
@@ -622,16 +658,20 @@ function QuickPicks({
   return (
     <section>
       <div className="mx-auto w-full max-w-6xl px-5 pb-10 pt-2 md:px-8 md:pb-14">
-        <div className="mb-5 flex items-baseline justify-between gap-4">
-          <h2 className="font-display text-xl tracking-tight md:text-2xl">
-            Need it <span className="italic text-terracotta">fast</span>?
+        <div className="mb-6 flex items-baseline justify-between gap-4 md:mb-8">
+          <h2 className="font-display text-2xl tracking-tight md:text-3xl">
+            Need it{' '}
+            <span className="relative inline-block italic text-terracotta">
+              fast
+            </span>
+            ?
           </h2>
           <span className="text-[11px] uppercase tracking-[0.18em] text-ink-faint">
             Under 5 min
           </span>
         </div>
 
-        <div className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 md:mx-0 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 lg:grid-cols-6">
+        <div className="-mx-5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-5 pb-2 md:mx-0 md:grid md:grid-cols-3 md:gap-4 md:overflow-visible md:px-0 lg:grid-cols-5">
           {recipes.map((r, i) => (
             <div
               key={r.slug}
@@ -695,9 +735,13 @@ function BrowseAll({
   return (
     <section id="browse">
       <div className="mx-auto w-full max-w-6xl px-5 pb-16 pt-2 md:px-8 md:pb-20">
-        <div className="mb-5 flex items-baseline justify-between gap-4">
-          <h2 className="font-display text-2xl tracking-tight md:text-3xl">
-            Your <span className="italic">menu</span>.
+        <div className="mb-6 flex items-baseline justify-between gap-4 md:mb-8">
+          <h2 className="font-display text-3xl tracking-tight md:text-4xl">
+            Your{' '}
+            <span className="relative inline-block italic">
+              menu
+            </span>
+            .
           </h2>
           <span className="text-[11px] uppercase tracking-[0.18em] text-ink-faint">
             {Object.values(counts).reduce((a, b) => a + b, 0)} recipes
@@ -922,6 +966,25 @@ function XIcon({ className }: { className?: string }) {
         d="M6 6l12 12M18 6 6 18"
         stroke="currentColor"
         strokeWidth="2"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function WaveDivider({ className }: { className?: string }) {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 200 10"
+      preserveAspectRatio="none"
+      className={className ?? ''}
+      fill="none"
+    >
+      <path
+        d="M0 5 Q 25 1 50 5 T 100 5 T 150 5 T 200 5"
+        stroke="currentColor"
+        strokeWidth="1.5"
         strokeLinecap="round"
       />
     </svg>
