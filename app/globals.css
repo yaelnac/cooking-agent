@@ -80,8 +80,41 @@ button:disabled,
 
 .anim-fade-up { animation: fade-up 320ms ease-out both; }
 
-@keyframes hint-cycle {
-  0% { opacity: 0; transform: translateY(4px); }
-  15%, 85% { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(-4px); }
+@keyframes check-pop {
+  0% { transform: scale(0.6); opacity: 0; }
+  60% { transform: scale(1.18); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes step-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.anim-step-in { animation: step-fade-in 380ms ease-out both; }
+.anim-check-pop { animation: check-pop 320ms cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+@keyframes float-soft {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-7px); }
+}
+.anim-float { animation: float-soft 6s ease-in-out infinite; }
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.anim-rise { animation: rise-in 520ms cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes sheen-sweep {
+  0% { transform: translateX(-140%) skewX(-12deg); }
+  55%, 100% { transform: translateX(360%) skewX(-12deg); }
 }
