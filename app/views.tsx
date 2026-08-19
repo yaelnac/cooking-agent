@@ -497,46 +497,58 @@ export function CookingView({
       </div>
 
       <div className="relative z-10 mx-auto my-auto w-full max-w-xl px-5 py-8 lg:max-w-6xl lg:px-8 lg:py-10">
-        <SessionHeader
-          recipeName={recipeName}
-          currentIndex={currentIndex}
-          totalSteps={totalSteps}
-          progress={progress}
-          isSpeaking={isSpeaking}
-          isListening={isListening}
-          status={status}
-        />
-
-        {session.completed && <CompletedBanner recipeName={recipeName} />}
-
-        <div className="mt-7 lg:grid lg:grid-cols-12 lg:items-start lg:gap-10">
-          {/* the recipe — lit up step by step as the agent narrates */}
-          <div className="lg:col-span-8">
-            {recipeSteps && recipeSteps.length > 0 ? (
-              <RecipeFollow
-                steps={recipeSteps}
-                currentIndex={currentIndex}
-                completed={session.completed}
-                isSpeaking={isSpeaking}
-                onGoToStep={goToStep}
-                onComplete={markComplete}
-              />
-            ) : (
-              <SoloStep step={session.step} />
-            )}
-          </div>
-
-          {/* support */}
-          <div className="mt-6 flex flex-col gap-5 lg:col-span-4 lg:mt-0">
-            <TimerStack timers={session.timers} onDismiss={onDismissTimer} />
-            <IngredientsPanel
-              ingredients={session.ingredients}
-              readyCount={ingredientsReady}
-              totalCount={ingredientsTotal}
-              onToggle={toggleIngredient}
+        {session.completed ? (
+          // The finish gets the whole stage. Header, progress bar, step list,
+          // voice chip — each would only restate "done" and crowd the moment.
+          <div className="mx-auto w-full max-w-xl">
+            <CompletedCard
+              recipeName={recipeName}
+              recipe={initialRecipe ?? null}
+              onEnd={endSession}
             />
           </div>
-        </div>
+        ) : (
+          <>
+            <SessionHeader
+              recipeName={recipeName}
+              currentIndex={currentIndex}
+              totalSteps={totalSteps}
+              progress={progress}
+              isSpeaking={isSpeaking}
+              isListening={isListening}
+              status={status}
+            />
+
+            <div className="mt-7 lg:grid lg:grid-cols-12 lg:items-start lg:gap-10">
+              {/* the recipe — lit up step by step as the agent narrates */}
+              <div className="lg:col-span-8">
+                {recipeSteps && recipeSteps.length > 0 ? (
+                  <RecipeFollow
+                    steps={recipeSteps}
+                    currentIndex={currentIndex}
+                    completed={session.completed}
+                    isSpeaking={isSpeaking}
+                    onGoToStep={goToStep}
+                    onComplete={markComplete}
+                  />
+                ) : (
+                  <SoloStep step={session.step} />
+                )}
+              </div>
+
+              {/* support */}
+              <div className="mt-6 flex flex-col gap-5 lg:col-span-4 lg:mt-0">
+                <TimerStack timers={session.timers} onDismiss={onDismissTimer} />
+                <IngredientsPanel
+                  ingredients={session.ingredients}
+                  readyCount={ingredientsReady}
+                  totalCount={ingredientsTotal}
+                  onToggle={toggleIngredient}
+                />
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       <BottomBar
@@ -648,19 +660,65 @@ function VoiceMeter({
   );
 }
 
-function CompletedBanner({ recipeName }: { recipeName: string }) {
+// The finish is the peak of the whole experience: celebrate, show the payoff
+// the user actually cooked for (time + macros), and offer one clear way out —
+// the voice session shouldn't keep running while the food gets cold.
+function CompletedCard({
+  recipeName,
+  recipe,
+  onEnd,
+}: {
+  recipeName: string;
+  recipe: Recipe | null;
+  onEnd: () => void;
+}) {
   return (
-    <div className="anim-rise mt-6 flex items-center gap-4 rounded-3xl border border-forest/25 bg-forest-soft p-5 shadow-[0_24px_60px_-40px_rgba(31,77,60,0.5)] md:p-6">
-      <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-forest text-paper shadow-[0_14px_28px_-16px_rgba(31,77,60,0.9)]">
-        <CheckIcon className="h-5 w-5" />
+    <div className="anim-rise flex flex-col items-center gap-5 rounded-3xl border border-forest/25 bg-forest-soft p-7 text-center shadow-[0_24px_60px_-40px_rgba(31,77,60,0.5)] md:p-9">
+      <span className="anim-check-pop grid h-16 w-16 shrink-0 place-items-center rounded-full bg-forest text-paper shadow-[0_18px_36px_-16px_rgba(31,77,60,0.9)]">
+        <CheckIcon className="h-7 w-7" />
       </span>
-      <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-forest/70">
+
+      <div className="flex flex-col gap-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.24em] text-forest/70">
           Cook-along complete
         </span>
-        <h2 className="font-display text-xl leading-tight tracking-tight text-forest md:text-2xl">
+        <h2 className="font-display text-2xl leading-tight tracking-tight text-forest md:text-3xl">
           {recipeName} is plated. Take the first bite.
         </h2>
+      </div>
+
+      {recipe && (
+        <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5 text-sm text-forest/80">
+          <span className="flex items-center gap-1.5">
+            <ClockIcon className="h-3.5 w-3.5" />
+            ~{recipe.minutes} min, start to plate
+          </span>
+          <span aria-hidden className="opacity-50">
+            ·
+          </span>
+          <span className="font-semibold text-forest">
+            {recipe.protein[0]}–{recipe.protein[1]}g protein banked
+          </span>
+          <span aria-hidden className="opacity-50">
+            ·
+          </span>
+          <span>
+            {recipe.calories[0]}–{recipe.calories[1]} kcal
+          </span>
+        </div>
+      )}
+
+      <div className="flex flex-col items-center gap-2">
+        <button
+          onClick={onEnd}
+          className="flex cursor-pointer items-center gap-2 rounded-full bg-forest px-6 py-3 text-sm font-semibold text-paper shadow-[0_18px_36px_-16px_rgba(31,77,60,0.9)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_42px_-16px_rgba(31,77,60,0.95)]"
+        >
+          Wrap up & enjoy
+          <ArrowIcon className="h-4 w-4" />
+        </button>
+        <p className="text-xs leading-relaxed text-forest/70">
+          Ends the voice session — or just keep chatting.
+        </p>
       </div>
     </div>
   );
