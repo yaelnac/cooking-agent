@@ -15,6 +15,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import {
   CATEGORIES,
@@ -110,8 +111,29 @@ export function buildAgentBriefing(recipe: Recipe): string {
   );
   lines.push('- When a step has a timer, call startTimer(seconds, label).');
   lines.push('- When the dish is finished and plated, call completeRecipe().');
+  lines.push('');
+  lines.push(
+    'The user can also tap the screen instead of speaking. When you get a message that starts with "I tapped the screen", the display has already moved — do not call setCurrentStep for it. Just pick up from there out loud: if it names a step, walk them through that step; if it says the dish is plated, give a short warm send-off.',
+  );
   return lines.join('\n');
 }
+
+// The chooser greets by mealtime — the right three dishes at the right hour.
+const MEAL_HEADLINES: Record<RecipeCategory, string> = {
+  Breakfast: 'What’s for breakfast?',
+  Lunch: 'What’s for lunch?',
+  Dinner: 'What’s for dinner?',
+  Snacks: 'Craving something?',
+};
+
+function mealForHour(hour: number): RecipeCategory {
+  if (hour >= 5 && hour < 11) return 'Breakfast';
+  if (hour >= 11 && hour < 16) return 'Lunch';
+  if (hour >= 16 && hour < 22) return 'Dinner';
+  return 'Snacks';
+}
+
+const emptySubscribe = () => () => {};
 
 export function HomeView() {
   const [category, setCategory] = useState<RecipeCategory>('Breakfast');
@@ -202,9 +224,9 @@ function Hero({ onTap, status }: { onTap: () => void; status: string }) {
           <p className="text-sm text-ink-faint">Opening the kitchen...</p>
         ) : (
           <p className="max-w-xs text-sm leading-relaxed text-ink-faint">
-            Start with a dish, ingredient, or craving.{' '}
+            Pick a dish and cook it hands-free.{' '}
             <span className="font-display italic text-ink-soft">
-              Chicken rice works great.
+              Every step, read aloud at your pace.
             </span>
           </p>
         )}
@@ -348,7 +370,7 @@ export function CookingView({
 
   // Follow the user's own voice: when they say "done" / "next" / "back", move
   // the highlighted step — no dependency on the agent calling setCurrentStep.
-  useConversation({
+  const { sendUserMessage } = useConversation({
     onMessage: ({ message, role }) => {
       if (role !== 'user') return;
       const cmd = detectStepCommand(message);
@@ -429,6 +451,20 @@ export function CookingView({
   const markComplete = () =>
     setSession((s) => ({ ...s, completed: true }));
 
+  // Tapping the screen must reach the agent too, or the voice keeps narrating
+  // the old step while the screen has moved on. The messages are phrased to
+  // dodge every detectStepCommand keyword, so when their transcript comes
+  // back through onMessage it can't re-advance the step a second time.
+  const handleManualStep = (index: number) => {
+    goToStep(index);
+    sendUserMessage(`I tapped the screen — please walk me through step ${index} now.`);
+  };
+
+  const handleManualComplete = () => {
+    markComplete();
+    sendUserMessage('I tapped the screen — the dish is plated, we are wrapped up.');
+  };
+
   const recipeName =
     session.recipe?.name ?? initialRecipe?.name ?? 'Voice cook-along';
   const sessionStarted = status === 'connected' || status === 'connecting';
@@ -454,12 +490,23 @@ export function CookingView({
   const ingredientsReady = session.ingredients.filter((i) => i.checked).length;
   const ingredientsTotal = session.ingredients.length;
 
+  // No open mic anymore: without a chosen recipe there's nothing to cook yet,
+  // so this route becomes a guided choice — pick a dish, then start.
+  if (!initialRecipe) {
+    return (
+      <RecipeChooser
+        onPick={(r) => router.push(`${COOKING_PATH}?slug=${r.slug}`)}
+        onBack={() => router.push('/')}
+      />
+    );
+  }
+
   // Before the voice session connects, the page is a calm "ready room" — no
   // mic, no tokens — where you gather ingredients and start when you choose.
   if (!sessionStarted) {
     return (
       <ReadyRoom
-        recipe={initialRecipe ?? null}
+        recipe={initialRecipe}
         ingredients={session.ingredients}
         onToggleIngredient={toggleIngredient}
         onStart={handleStart}
@@ -528,8 +575,8 @@ export function CookingView({
                     currentIndex={currentIndex}
                     completed={session.completed}
                     isSpeaking={isSpeaking}
-                    onGoToStep={goToStep}
-                    onComplete={markComplete}
+                    onGoToStep={handleManualStep}
+                    onComplete={handleManualComplete}
                   />
                 ) : (
                   <SoloStep step={session.step} />
@@ -1564,6 +1611,194 @@ function IdleOrb({ onTap, loading }: { onTap: () => void; loading: boolean }) {
         <span className="text-[13px] font-medium tracking-wide">
           {loading ? 'Connecting…' : 'Tap to cook'}
         </span>
+      </span>
+    </button>
+  );
+}
+
+// One decision per screen: /cook without a dish shows three recipes that fit
+// the hour (fastest first, flagged) — a confident default instead of an open
+// mic and a blank stare. "Browse the full menu" expands right here, in place:
+// the journey only ever moves forward (choose → gather → cook), never back
+// out to the homepage.
+function RecipeChooser({
+  onPick,
+  onBack,
+}: {
+  onPick: (recipe: Recipe) => void;
+  onBack: () => void;
+}) {
+  // Mealtime comes from the visitor's clock, which the static prerender
+  // can't know — so the server snapshot is null and the client fills it in.
+  const meal = useSyncExternalStore(
+    emptySubscribe,
+    () => mealForHour(new Date().getHours()),
+    () => null,
+  );
+
+  // null = the short list; a category = the full menu, opened on that tab.
+  const [browseCategory, setBrowseCategory] = useState<RecipeCategory | null>(
+    null,
+  );
+  const browsing = browseCategory !== null;
+
+  const featured = useMemo(() => {
+    const pool = meal ? RECIPES.filter((r) => r.category === meal) : RECIPES;
+    return [...pool].sort((a, b) => a.minutes - b.minutes).slice(0, 3);
+  }, [meal]);
+
+  const counts = useMemo(() => {
+    const map: Record<RecipeCategory, number> = {
+      Breakfast: 0, Lunch: 0, Dinner: 0, Snacks: 0,
+    };
+    for (const r of RECIPES) map[r.category]++;
+    return map;
+  }, []);
+
+  const browseList = useMemo(() => {
+    if (!browseCategory) return [];
+    return RECIPES.filter((r) => r.category === browseCategory).sort(
+      (a, b) => a.minutes - b.minutes,
+    );
+  }, [browseCategory]);
+
+  return (
+    <div className="relative flex min-h-screen flex-col">
+      {/* ambient warmth — matches the home & ready-room pages */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 overflow-hidden"
+      >
+        <span className="absolute left-1/2 top-[-70px] h-[360px] w-[360px] -translate-x-1/2 rounded-full bg-butter/55 blur-3xl" />
+        <span className="absolute right-[-90px] top-[180px] h-72 w-72 rounded-full bg-terracotta/12 blur-3xl" />
+        <span className="absolute left-[-90px] top-[540px] h-72 w-72 rounded-full bg-forest/10 blur-3xl" />
+      </div>
+
+      {/* top bar */}
+      <div className="relative z-10 px-5 pt-5 lg:px-8">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
+          <button
+            onClick={onBack}
+            aria-label="Back to recipes"
+            className="flex items-center gap-1.5 rounded-full border border-line bg-paper/80 py-1.5 pl-2 pr-3.5 text-xs font-medium text-ink-soft backdrop-blur transition hover:border-ink-faint hover:text-ink"
+          >
+            <ArrowIcon className="h-3.5 w-3.5 rotate-180" />
+            Back
+          </button>
+          <span className="flex items-center gap-1.5 rounded-full bg-paper/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint backdrop-blur">
+            <span className="h-1.5 w-1.5 rounded-full bg-terracotta" />
+            Voice cook-along
+          </span>
+        </div>
+      </div>
+
+      <div className="relative z-10 mx-auto my-auto flex w-full max-w-xl flex-col items-center px-5 py-10">
+        <ReadyOrb starting={false} size="h-24 w-24 lg:h-28 lg:w-28" />
+
+        <span className="mt-7 text-[11px] font-semibold uppercase tracking-[0.24em] text-terracotta">
+          {meal ? `${meal} time` : 'Ready when you are'}
+        </span>
+        <h1 className="mt-2 text-center font-display text-[32px] leading-[1.07] tracking-tight text-ink md:text-[40px]">
+          {meal ? MEAL_HEADLINES[meal] : 'What are we cooking?'}
+        </h1>
+        <p className="mt-3 max-w-[22rem] text-center text-sm leading-relaxed text-ink-soft lg:text-[15px]">
+          Pick a dish — I’ll read every step aloud while your hands do the
+          work.
+        </p>
+
+        {!browsing ? (
+          <>
+            <ul className="mt-8 flex w-full flex-col gap-2.5">
+              {featured.map((r, i) => (
+                <li
+                  key={r.slug}
+                  className="anim-fade-up"
+                  style={{ animationDelay: `${i * 60}ms` }}
+                >
+                  <ChooserRecipeRow
+                    recipe={r}
+                    badge={i === 0 ? 'Fastest' : undefined}
+                    onPick={() => onPick(r)}
+                  />
+                </li>
+              ))}
+            </ul>
+
+            <button
+              onClick={() => setBrowseCategory(meal ?? 'Dinner')}
+              className="mt-6 flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium text-ink-soft transition hover:text-ink"
+            >
+              Browse the full menu
+              <ChevronIcon className="h-3.5 w-3.5 rotate-180" />
+            </button>
+          </>
+        ) : (
+          <div className="anim-fade-up mt-8 flex w-full flex-col items-center gap-4">
+            <CategoryTabs
+              active={browseCategory}
+              counts={counts}
+              onChange={setBrowseCategory}
+            />
+            <ul className="flex w-full flex-col gap-2.5">
+              {browseList.map((r, i) => (
+                <li
+                  key={r.slug}
+                  className="anim-fade-up"
+                  style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}
+                >
+                  <ChooserRecipeRow recipe={r} onPick={() => onPick(r)} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// A dish as one glanceable, tappable row: name, its one-line pitch, and the
+// two facts the choice actually turns on — minutes and protein.
+function ChooserRecipeRow({
+  recipe,
+  badge,
+  onPick,
+}: {
+  recipe: Recipe;
+  badge?: string;
+  onPick: () => void;
+}) {
+  return (
+    <button
+      onClick={onPick}
+      className="group flex w-full cursor-pointer items-center gap-4 rounded-2xl border border-line bg-paper/80 p-4 text-left backdrop-blur transition hover:-translate-y-0.5 hover:border-ink-faint hover:shadow-[0_24px_45px_-30px_rgba(26,20,16,0.4)]"
+    >
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex items-center gap-2">
+          <span className="truncate font-display text-lg tracking-tight text-ink">
+            {recipe.name}
+          </span>
+          {badge && (
+            <span className="shrink-0 rounded-full bg-butter px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink">
+              {badge}
+            </span>
+          )}
+        </span>
+        <span className="truncate text-[13px] italic text-ink-soft">
+          {recipe.angle}
+        </span>
+      </div>
+      <div className="flex shrink-0 flex-col items-end gap-0.5 text-[13px]">
+        <span className="flex items-center gap-1 text-ink-soft">
+          <ClockIcon className="h-3.5 w-3.5" />
+          {recipe.minutes} min
+        </span>
+        <span className="font-semibold text-forest">
+          {recipe.protein[0]}–{recipe.protein[1]}g protein
+        </span>
+      </div>
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-cream text-ink transition group-hover:bg-terracotta group-hover:text-paper">
+        <ArrowIcon className="h-4 w-4" />
       </span>
     </button>
   );

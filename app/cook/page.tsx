@@ -34,6 +34,9 @@ function CookPageInner() {
   // The voice session starts only when the user taps "Start" — never on page
   // load — so landing on /cook (with or without a slug) spends no tokens.
   const handleStart = useCallback(async () => {
+    // Sessions always start from a chosen recipe — without one, the page
+    // shows the recipe chooser and there is nothing to start.
+    if (!recipe) return;
     if (!agentId) {
       alert('Missing NEXT_PUBLIC_ELEVENLABS_AGENT_ID');
       return;
@@ -42,18 +45,14 @@ function CookPageInner() {
     startSession({
       agentId,
       connectionType: 'websocket',
-      ...(recipe
-        ? {
-            overrides: {
-              agent: {
-                firstMessage: `Let's make ${recipe.name}. Ready when you are.`,
-                prompt: {
-                  prompt: buildAgentBriefing(recipe),
-                },
-              },
-            },
-          }
-        : {}),
+      overrides: {
+        agent: {
+          firstMessage: `Let's make ${recipe.name}. Ready when you are.`,
+          prompt: {
+            prompt: buildAgentBriefing(recipe),
+          },
+        },
+      },
     });
   }, [startSession, recipe]);
 
