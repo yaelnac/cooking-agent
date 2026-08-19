@@ -21,8 +21,14 @@ export type Recipe = {
   protein: [number, number];
   minutes: number;
   tags: string[];
-  ingredients?: Ingredient[];
-  steps?: RecipeStep[];
+  ingredients: Ingredient[];
+  steps: RecipeStep[];
+};
+
+// Session-side view of an ingredient: same data plus whether the cook has
+// ticked it off.
+export type IngredientState = Ingredient & {
+  checked: boolean;
 };
 
 export const RECIPES: Recipe[] = [

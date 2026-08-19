@@ -18,12 +18,12 @@ Who it's for: one person cooking one meal, who wants protein on the plate withou
 
 ## How To Use It
 
-1. Pick a recipe from quick picks or browse by meal.
+1. Pick a dish — the homepage suggests one for the current mealtime, or browse the full menu by meal.
 2. Read the ready room — ingredients, time, steps, protein, and calories — and tick off what you have.
 3. Tap start and allow the microphone.
 4. Cook. The voice reads a step and waits.
 5. Say "done" or "next" to move on, "repeat" to hear it again, "back" to return to the previous step.
-6. When the dish is plated, the session ends and you land back home.
+6. When the dish is plated, a completion card sums up the cook. Wrap up to end the session and land back home.
 
 Nothing connects until you tap start. Opening the app, browsing recipes, and gathering ingredients all happen with the mic off.
 
@@ -31,13 +31,13 @@ Nothing connects until you tap start. Opening the app, browsing recipes, and gat
 
 | Area | What it does |
 | --- | --- |
-| Recipe library | 40 recipes across breakfast, lunch, dinner, and snacks, each with ingredients and full steps |
-| Quick picks | Everything that takes five minutes or less, sorted fastest first |
+| Recipe library | 39 recipes across breakfast, lunch, dinner, and snacks, each with ingredients and full steps |
+| Mealtime pick | The homepage suggests the fastest dish for the current mealtime, with a one-tap "Another" reroll |
 | Ready room | Ingredient checklist, time, step count, protein, and calorie range before the mic turns on |
 | Voice cook-along | Step-by-step narration paced by you, not by a timer |
 | Live screen | Current step highlights, ingredients tick off, progress bar fills |
 | Timers | Named countdowns started by the voice, ticking on screen, dismissible by hand |
-| Manual fallback | Tap any step, or use the step controls, if you would rather not talk |
+| Manual fallback | Next step / Finish buttons on the current step, relayed to the agent so the voice follows |
 
 ## Local Development
 
@@ -61,8 +61,8 @@ The app drives the screen through ElevenLabs client tools. Your agent needs thes
 
 | Tool | Parameters | Effect |
 | --- | --- | --- |
-| `setActiveRecipe` | `name`, `slug?`, `calories?`, `protein?` | Names the dish and loads its ingredients |
-| `setCurrentStep` | `index`, `total`, `title?`, `text?` | Highlights the step being explained |
+| `setActiveRecipe` | `name`, `slug?` | Names the dish and loads its ingredients |
+| `setCurrentStep` | `index`, `total` | Highlights the step being explained |
 | `setIngredients` | `items[]` | Replaces the ingredient list |
 | `checkIngredient` | `name` | Ticks one ingredient off |
 | `startTimer` | `seconds`, `label` | Starts a named countdown |
@@ -85,13 +85,22 @@ The rest of the prompt is built per session. When you open a recipe, the app sen
 
 ```
 app/
-  page.tsx               Home — hero, quick picks, browse by category
-  cook/page.tsx          Cook-along route, reads ?slug= and starts the session
-  views.tsx              Every view: home, ready room, cooking screen, UI pieces
-  recipes.ts             The 40 recipes, their ingredients, steps, and timers
+  page.tsx               Home route
+  cook/page.tsx          Cook-along route: reads ?slug=, owns session start and errors
   conversation-shell.tsx ElevenLabs provider wrapping the app
   layout.tsx             Fonts, metadata, shell
   globals.css            Theme tokens and animations
+components/
+  home/                  Homepage: mealtime pick, menu, recipe rows
+  session/               Ready room, cooking screen, steps, timers, ingredients
+  shared/                Card shell, voice orb and wave bars
+  icons.tsx              Inline SVG icons
+lib/
+  recipes.ts             The 39 recipes, their ingredients, steps, and timers
+  agent-briefing.ts      Per-recipe system prompt for the agent
+  step-commands.ts       Voice command parsing and step-advance rules (tested)
+  mealtime.ts            Hour-of-day to meal category
+  format.ts              Small formatting helpers
 ```
 
 Main cooking flow:
@@ -108,12 +117,13 @@ recipes.ts -> /cook?slug= -> buildAgentBriefing() -> ElevenLabs session -> clien
 | `npm run build` | Build for production |
 | `npm run start` | Start the production app |
 | `npm run lint` | Run ESLint |
+| `npm test` | Run the unit tests (Vitest) |
 
 ## Design Notes
 
 The voice session starts only when you tap start. Landing on `/cook`, with or without a recipe, opens no connection and spends no credits.
 
-The screen does not depend on the agent behaving. Steps advance from your own words — the app listens for "done," "next," "back," and their cousins — and every step is tappable by hand. If the agent forgets to call a tool, you can still cook.
+The screen does not depend on the agent behaving. Steps advance from your own words — the app listens for "done," "next," "back," and their cousins — and the current step has Next / Finish buttons that also tell the agent where you are. If the agent forgets to call a tool, you can still cook.
 
 Recipes are data, not prose. Each one carries structured ingredients and steps, so the same recipe feeds the checklist, the screen, and the agent's briefing without being written three times.
 

@@ -5,9 +5,10 @@ import {
   useConversationStatus,
 } from '@elevenlabs/react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react';
-import { getRecipeBySlug } from '../recipes';
-import { buildAgentBriefing, CookingView } from '../views';
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { CookingView } from '@/components/session/cooking-view';
+import { buildAgentBriefing } from '@/lib/agent-briefing';
+import { getRecipeBySlug } from '@/lib/recipes';
 
 const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
 
@@ -19,37 +20,45 @@ function CookPageInner() {
   const slug = searchParams.get('slug');
   const recipe = useMemo(() => getRecipeBySlug(slug), [slug]);
   const hadActiveSessionRef = useRef(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
+  // Return home once a session that was live ends.
   useEffect(() => {
     if (status === 'connected' || status === 'connecting') {
       hadActiveSessionRef.current = true;
       return;
     }
-
     if (hadActiveSessionRef.current && status === 'disconnected') {
       router.replace('/');
     }
   }, [status, router]);
 
   // Recipes are chosen on the homepage; /cook without a valid slug has
-  // nothing to show, so send the visitor back to the menu.
+  // nothing to show.
   useEffect(() => {
     if (!recipe) {
       router.replace('/');
     }
   }, [recipe, router]);
 
-  // The voice session starts only when the user taps "Start" — never on page
-  // load — so landing on /cook (with or without a slug) spends no tokens.
+  // The session starts only on user tap — landing here opens no connection.
   const handleStart = useCallback(async () => {
-    // Sessions always start from a chosen recipe — without one, the page
-    // shows the recipe chooser and there is nothing to start.
     if (!recipe) return;
     if (!agentId) {
-      alert('Missing NEXT_PUBLIC_ELEVENLABS_AGENT_ID');
+      setStartError(
+        'Voice is not configured — set NEXT_PUBLIC_ELEVENLABS_AGENT_ID and restart.',
+      );
       return;
     }
-    await navigator.mediaDevices.getUserMedia({ audio: true });
+    setStartError(null);
+    try {
+      await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setStartError(
+        'Microphone access was blocked. Allow it in your browser, then try again.',
+      );
+      return;
+    }
     startSession({
       agentId,
       connectionType: 'websocket',
@@ -66,7 +75,11 @@ function CookPageInner() {
 
   return (
     <main className="flex w-full flex-1 flex-col">
-      <CookingView initialRecipe={recipe} onStart={handleStart} />
+      <CookingView
+        initialRecipe={recipe}
+        onStart={handleStart}
+        startError={startError}
+      />
     </main>
   );
 }

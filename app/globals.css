@@ -20,6 +20,7 @@
   --font-sans: var(--font-geist-sans);
   --font-display: var(--font-fraunces);
   --font-mono: var(--font-geist-mono);
+  --shadow-card: 0 22px 55px -44px rgba(26, 20, 16, 0.55);
 }
 
 :root {
