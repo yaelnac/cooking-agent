@@ -199,9 +199,10 @@ export function CookingView({
   // message (see lib/step-commands.ts) so the voice follows without the
   // transcript re-triggering the voice fallback above.
   const handleManualStep = (index: number) => {
+    if (!initialRecipe) return;
     setSession((s) => ({
       ...s,
-      step: { index, total: s.step?.total ?? initialRecipe?.steps.length ?? index },
+      step: { index, total: s.step?.total ?? initialRecipe.steps.length },
       completed: false,
     }));
     sendUserMessage(screenStepMessage(index));

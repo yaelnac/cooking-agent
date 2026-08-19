@@ -132,6 +132,7 @@ function PickCard({
 }) {
   const pickLabel =
     meal === 'Dinner' ? 'Tonight’s pick' : meal ? `${meal} pick` : 'Our pick';
+  // Keyed by slug: rerolling remounts the card so anim-step-in replays.
   return (
     <div
       key={recipe.slug}
