@@ -213,9 +213,11 @@ function Hero({ onTap, status }: { onTap: () => void; status: string }) {
   );
 }
 
-// Reads a short user utterance and decides whether it means "go forward" or
-// "go back" — so the recipe can follow the user's voice directly.
-function detectStepCommand(message: string): 'next' | 'back' | null {
+// Reads a short user utterance and decides how to move the recipe.
+// 'next' = the user finished the step they're looking at ("done").
+// 'begin' = a soft go-ahead ("ready") — starts step 1 if nothing is
+// highlighted yet, otherwise advances like 'next'.
+function detectStepCommand(message: string): 'next' | 'begin' | 'back' | null {
   const norm = message
     .toLowerCase()
     .replace(/[^a-z\s]/g, ' ')
@@ -225,12 +227,13 @@ function detectStepCommand(message: string): 'next' | 'back' | null {
   if (wordCount === 0 || wordCount > 7) return null;
   if (/\b(repeat|again)\b/.test(norm)) return null;
   if (/\b(back|previous|go back)\b/.test(norm)) return 'back';
+  if (/\b(done|finished|next|next step|move on)\b/.test(norm)) return 'next';
   if (
-    /\b(done|next|ready|continue|finished|proceed|move on|go on|keep going|got it|next step|all set)\b/.test(
+    /\b(ready|continue|proceed|go on|keep going|got it|all set|start|begin)\b/.test(
       norm,
     )
   ) {
-    return 'next';
+    return 'begin';
   }
   return null;
 }
@@ -352,8 +355,10 @@ export function CookingView({
       if (!cmd) return;
       const stepTotal = initialRecipe?.steps?.length ?? 0;
       setSession((s) => {
-        // Index 0 = "not started". The first advance lands on step 1; both
-        // 0 and 1 display as step 1, so that first command never skips.
+        // Index 0 = "not started", but the screen already shows step 1 as
+        // current. So a completion word ('next') moves past the step the
+        // user is looking at — max(cur, 1) + 1 — while a kickoff word
+        // ('begin') with nothing highlighted yet just lands on step 1.
         const cur = s.step?.index ?? 0;
         const total = s.step?.total ?? stepTotal;
         if (cmd === 'back') {
@@ -364,12 +369,14 @@ export function CookingView({
             completed: false,
           };
         }
-        if (total > 0 && cur >= total) {
+        const target =
+          cmd === 'begin' && cur === 0 ? 1 : Math.max(cur, 1) + 1;
+        if (total > 0 && target > total) {
           return { ...s, completed: true };
         }
         return {
           ...s,
-          step: { index: cur + 1, total: total > 0 ? total : cur + 1 },
+          step: { index: target, total: total > 0 ? total : target },
           completed: false,
         };
       });
@@ -463,7 +470,7 @@ export function CookingView({
   }
 
   return (
-    <div className="relative min-h-screen">
+    <div className="relative flex min-h-screen flex-col pb-24">
       {/* ambient warmth — matches the home & ready-room pages */}
       <div
         aria-hidden
@@ -489,7 +496,7 @@ export function CookingView({
         </div>
       </div>
 
-      <div className="relative z-10 mx-auto w-full max-w-xl px-5 pb-32 pt-7 lg:max-w-6xl lg:px-8 lg:pb-24 lg:pt-9">
+      <div className="relative z-10 mx-auto my-auto w-full max-w-xl px-5 py-8 lg:max-w-6xl lg:px-8 lg:py-10">
         <SessionHeader
           recipeName={recipeName}
           currentIndex={currentIndex}
