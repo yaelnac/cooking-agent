@@ -199,6 +199,15 @@ export function HomeView() {
         </span>
       </header>
 
+      {/* Mealtime comes from the visitor's clock, which the static HTML
+          can't know — so the time-aware content stays invisible (height
+          reserved, no layout shift) until hydration reads the hour, then
+          fades in. A soft reveal beats flashing the wrong question. */}
+      <div
+        className={`flex flex-col transition-opacity duration-300 ${
+          meal ? 'opacity-100' : 'opacity-0'
+        }`}
+      >
       {/* split hero: the question on the left, the answer on the right —
           and the menu starts right below, peeking above the fold */}
       {pick && (
@@ -236,12 +245,13 @@ export function HomeView() {
       )}
 
       <BrowseAll
-        category={category}
+        category={chosenCategory ?? meal}
         counts={counts}
         recipes={filtered}
         onChangeCategory={setChosenCategory}
         onPick={handleStart}
       />
+      </div>
     </div>
   );
 }
@@ -1378,7 +1388,9 @@ function BrowseAll({
   onChangeCategory,
   onPick,
 }: {
-  category: RecipeCategory;
+  // null = mealtime not known yet: no tab shows as selected, so a refresh
+  // can never flash the wrong one.
+  category: RecipeCategory | null;
   counts: Record<RecipeCategory, number>;
   recipes: Recipe[];
   onChangeCategory: (c: RecipeCategory) => void;
@@ -1429,7 +1441,7 @@ function CategoryTabs({
   counts,
   onChange,
 }: {
-  active: RecipeCategory;
+  active: RecipeCategory | null;
   counts: Record<RecipeCategory, number>;
   onChange: (c: RecipeCategory) => void;
 }) {
