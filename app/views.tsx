@@ -10,7 +10,6 @@ import {
 } from '@elevenlabs/react';
 import { useRouter } from 'next/navigation';
 import {
-  type ReactNode,
   useCallback,
   useEffect,
   useMemo,
@@ -205,7 +204,7 @@ function Hero({ onTap, status }: { onTap: () => void; status: string }) {
           <p className="max-w-xs text-sm leading-relaxed text-ink-faint">
             Start with a dish, ingredient, or craving.{' '}
             <span className="font-display italic text-ink-soft">
-              Chicken rice works beautifully.
+              Chicken rice works great.
             </span>
           </p>
         )}
@@ -653,7 +652,7 @@ function CompletedBanner({ recipeName }: { recipeName: string }) {
           Cook-along complete
         </span>
         <h2 className="font-display text-xl leading-tight tracking-tight text-forest md:text-2xl">
-          {recipeName} — plated. Take the first bite.
+          {recipeName} is plated. Take the first bite.
         </h2>
       </div>
     </div>
@@ -848,7 +847,7 @@ function SoloStep({ step }: { step: CurrentStep | null }) {
           What are we cooking?
         </h2>
         <p className="max-w-xs text-sm leading-relaxed text-ink-faint">
-          Say a dish, an ingredient, or a craving — out loud — and I’ll walk you
+          Say a dish, an ingredient, or a craving out loud, and I’ll walk you
           through it, step by step.
         </p>
       </div>
@@ -1528,19 +1527,45 @@ function ReadyRoom({
     <header className="anim-rise flex flex-col items-center text-center">
       <ReadyOrb starting={starting} />
 
-      <span className="mt-8 text-[11px] font-semibold uppercase tracking-[0.24em] text-ink-faint">
-        Voice cook-along
-      </span>
+      {recipe && (
+        <span className="mt-8 text-[11px] font-semibold uppercase tracking-[0.24em] text-ink-faint">
+          Voice cook-along
+        </span>
+      )}
 
-      <h1 className="mt-3 font-display text-[34px] leading-[1.07] tracking-tight text-ink md:text-[42px] lg:text-[46px]">
+      <h1
+        className={`${recipe ? 'mt-3' : 'mt-8'} font-display text-[34px] leading-[1.07] tracking-tight text-ink md:text-[42px] lg:text-[46px]`}
+      >
         {recipe ? recipe.name : 'What should we cook?'}
       </h1>
 
       <p className="mt-4 max-w-[20rem] text-sm leading-relaxed text-ink-soft lg:text-[15px]">
         {recipe
-          ? 'I read every step out loud and wait for you — so your hands stay in the bowl, not on the screen.'
-          : "Start the cook-along, then tell me a dish, an ingredient, or a craving — I'll turn it into steps you can cook by ear."}
+          ? 'I read every step out loud and wait for you, so your hands stay in the bowl, not on the screen.'
+          : "Say what you're craving. I'll turn it into a recipe and talk you through it, step by step."}
       </p>
+
+      {!recipe && (
+        <div className="mt-8 flex flex-col items-center gap-2.5">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-ink-faint">
+            Try saying
+          </span>
+          <ul className="flex flex-wrap justify-center gap-2">
+            {[
+              'Something high-protein for lunch',
+              'I have chicken and rice',
+              'A sweet snack, no cooking',
+            ].map((example) => (
+              <li
+                key={example}
+                className="rounded-full border border-line bg-paper/70 px-3.5 py-1.5 font-display text-[13px] italic text-ink-soft backdrop-blur"
+              >
+                “{example}”
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {recipe && (
         <div className="mt-8 grid w-full max-w-sm grid-cols-4 gap-2">
@@ -1566,45 +1591,11 @@ function ReadyRoom({
     </header>
   );
 
-  const howCard = (
-    <section
-      className="anim-rise rounded-3xl border border-line bg-paper/80 p-5 shadow-[0_22px_55px_-44px_rgba(26,20,16,0.55)] backdrop-blur lg:p-6"
-      style={{ animationDelay: '90ms' }}
-    >
-      <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-faint">
-        How it works
-      </span>
-      <h2 className="mt-1 font-display text-xl tracking-tight text-ink">
-        Cook with your ears
-      </h2>
-      <ul className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <HowStep
-          tone="terracotta"
-          icon={<MicIcon className="h-4 w-4" />}
-          title="Tap to begin"
-          body="Your mic switches on and the kitchen voice wakes up."
-        />
-        <HowStep
-          tone="butter"
-          icon={<SoundWaveIcon className="h-4 w-4" />}
-          title="Cook by ear"
-          body="I read each step aloud and highlight it on screen as I go."
-        />
-        <HowStep
-          tone="forest"
-          icon={<CheckIcon className="h-4 w-4" />}
-          title="You set the pace"
-          body={'Say “done” to move on, or “repeat” to hear it again.'}
-        />
-      </ul>
-    </section>
-  );
-
   const ingredientsCard =
     recipe && ingredients.length > 0 ? (
       <section
         className="anim-rise rounded-3xl border border-line bg-paper/80 p-5 shadow-[0_22px_55px_-44px_rgba(26,20,16,0.55)] backdrop-blur lg:p-6"
-        style={{ animationDelay: '170ms' }}
+        style={{ animationDelay: '90ms' }}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-col">
@@ -1624,7 +1615,7 @@ function ReadyRoom({
           </span>
         </div>
         <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
-          Set each one on the counter and tap it off. No rush — the voice waits
+          Set each one on the counter and tap it off. No rush, the voice waits
           for you.
         </p>
         <ul className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
@@ -1675,7 +1666,7 @@ function ReadyRoom({
     recipe && steps.length > 0 ? (
       <section
         className="anim-rise rounded-3xl border border-line bg-paper/80 p-5 shadow-[0_22px_55px_-44px_rgba(26,20,16,0.55)] backdrop-blur lg:p-6"
-        style={{ animationDelay: '250ms' }}
+        style={{ animationDelay: '170ms' }}
       >
         <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-faint">
           Step by step
@@ -1715,10 +1706,16 @@ function ReadyRoom({
       </section>
     ) : null;
 
-  const startCta = <StartCTA onStart={onStart} starting={starting} />;
+  const startCta = (
+    <StartCTA
+      onStart={onStart}
+      starting={starting}
+      hint={recipe ? undefined : 'Your mic turns on when you tap · end anytime'}
+    />
+  );
 
   return (
-    <div className="relative min-h-screen">
+    <div className="relative flex min-h-screen flex-col">
       {/* ambient warmth — clipped to the viewport */}
       <div
         aria-hidden
@@ -1757,17 +1754,15 @@ function ReadyRoom({
             </div>
             {/* the practical detail */}
             <div className="mt-6 flex flex-col gap-6 lg:col-span-7 lg:mt-0">
-              {howCard}
               {ingredientsCard}
               {pathCard}
             </div>
           </div>
         </div>
       ) : (
-        <div className="relative z-10 mx-auto flex w-full max-w-2xl flex-col gap-6 px-5 pb-44 pt-8 lg:pb-16 lg:pt-14">
+        <div className="relative z-10 mx-auto flex w-full max-w-2xl flex-1 flex-col justify-center gap-8 px-5 pb-44 pt-8 lg:min-h-[calc(100vh-72px)] lg:pb-24 lg:pt-0">
           {hero}
-          {howCard}
-          <div className="hidden lg:block">{startCta}</div>
+          <div className="mx-auto hidden w-full max-w-md lg:block">{startCta}</div>
         </div>
       )}
 
@@ -1787,9 +1782,11 @@ function ReadyRoom({
 function StartCTA({
   onStart,
   starting,
+  hint,
 }: {
   onStart: () => void;
   starting: boolean;
+  hint?: React.ReactNode;
 }) {
   return (
     <div>
@@ -1820,10 +1817,15 @@ function StartCTA({
         </span>
       </button>
       <p className="mt-2.5 text-center text-[11px] leading-relaxed text-ink-faint">
-        Mic turns on · say{' '}
-        <span className="font-semibold text-ink-soft">“done”</span> to advance,{' '}
-        <span className="font-semibold text-ink-soft">“repeat”</span> to hear it
-        again
+        {hint ?? (
+          <>
+            Mic turns on · say{' '}
+            <span className="font-semibold text-ink-soft">“done”</span> to
+            advance,{' '}
+            <span className="font-semibold text-ink-soft">“repeat”</span> to
+            hear it again
+          </>
+        )}
       </p>
     </div>
   );
@@ -1860,35 +1862,6 @@ function ReadyOrb({ starting }: { starting: boolean }) {
   );
 }
 
-function HowStep({
-  tone,
-  icon,
-  title,
-  body,
-}: {
-  tone: 'terracotta' | 'butter' | 'forest';
-  icon: ReactNode;
-  title: string;
-  body: string;
-}) {
-  const chip =
-    tone === 'terracotta'
-      ? 'bg-terracotta-soft text-terracotta-deep'
-      : tone === 'butter'
-      ? 'bg-butter text-ink'
-      : 'bg-forest-soft text-forest';
-  return (
-    <li className="flex flex-col gap-3 rounded-2xl border border-line bg-cream/40 p-4">
-      <span className={`grid h-9 w-9 place-items-center rounded-xl ${chip}`}>
-        {icon}
-      </span>
-      <div className="flex flex-col gap-1">
-        <span className="text-sm font-semibold text-ink">{title}</span>
-        <span className="text-xs leading-relaxed text-ink-faint">{body}</span>
-      </div>
-    </li>
-  );
-}
 
 function StatTile({
   label,

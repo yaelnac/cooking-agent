@@ -123,7 +123,7 @@ export const RECIPES: Recipe[] = [
         body: "Combine the oats and milk in a small pot over medium heat. Stir often until thick and creamy, about three minutes.",
         timer: { seconds: 180, label: "Oats simmer" },
       },
-      { title: "Cool slightly", body: "Take the pot off the heat and let it sit for one minute so it's warm, not scalding — protein powder clumps in boiling liquid." },
+      { title: "Cool slightly", body: "Take the pot off the heat and let it sit for one minute so it's warm, not scalding. Protein powder clumps in boiling liquid." },
       { title: "Stir in protein", body: "Add the protein powder and a pinch of cinnamon, stirring hard until fully smooth." },
       { title: "Top and serve", body: "Spoon into a bowl, fan the banana slices across the top, and finish with a swirl of peanut butter." },
     ],
@@ -176,7 +176,7 @@ export const RECIPES: Recipe[] = [
       { title: "Prep the eggs", body: "Whisk the egg whites and whole egg together with a pinch of salt and pepper until even in color." },
       { title: "Soften the veg", body: "Heat the olive oil in a nonstick pan over medium heat, add the tomatoes and spinach, and cook until the spinach wilts, about a minute." },
       { title: "Add the eggs", body: "Pour the eggs over the vegetables and let them sit for ten seconds before stirring." },
-      { title: "Scramble soft", body: "Stir slowly, pulling the eggs into folds, and take the pan off the heat while they still look slightly wet — they finish on the plate." },
+      { title: "Scramble soft", body: "Stir slowly, pulling the eggs into folds, and take the pan off the heat while they still look slightly wet. They finish on the plate." },
       { title: "Finish", body: "Slide onto a plate and crumble the feta over the top." },
     ],
   },
@@ -928,7 +928,7 @@ export const RECIPES: Recipe[] = [
       { item: "Sesame seeds", qty: "1 tsp" },
     ],
     steps: [
-      { title: "Coat the tofu", body: "Press the tofu, cut it into cubes, and toss with the cornstarch until lightly coated — this is what makes it crisp." },
+      { title: "Coat the tofu", body: "Press the tofu, cut it into cubes, and toss with the cornstarch until lightly coated. This is what makes it crisp." },
       {
         title: "Crisp the tofu",
         body: "Heat the olive oil in a pan over medium-high and cook the tofu, turning, until golden on all sides, about eight minutes.",
@@ -1012,7 +1012,7 @@ export const RECIPES: Recipe[] = [
       { item: "Vanilla extract", qty: "1/4 tsp" },
     ],
     steps: [
-      { title: "Toast the flour", body: "Briefly toast the almond flour in a dry pan over low heat until just fragrant, about one minute, then let it cool — this removes the raw taste." },
+      { title: "Toast the flour", body: "Briefly toast the almond flour in a dry pan over low heat until just fragrant, about one minute, then let it cool. This removes the raw taste." },
       { title: "Mix the base", body: "Stir the Greek yogurt with the protein powder, maple syrup, and vanilla until smooth." },
       { title: "Add the texture", body: "Fold in the cooled almond flour until the mixture thickens like cookie dough." },
       { title: "Finish", body: "Stir in most of the chocolate chips, spoon into a bowl, and scatter the rest on top." },
@@ -1131,7 +1131,7 @@ export const RECIPES: Recipe[] = [
       { item: "Cinnamon", qty: "1 pinch" },
     ],
     steps: [
-      { title: "Cool the coffee", body: "Brew the coffee and let it cool for a couple of minutes — hot coffee makes protein powder clump." },
+      { title: "Cool the coffee", body: "Brew the coffee and let it cool for a couple of minutes. Hot coffee makes protein powder clump." },
       { title: "Blend", body: "Add the coffee, protein powder, milk, and ice to a blender and blend until smooth and frothy." },
       { title: "Serve", body: "Pour over fresh ice and dust with a pinch of cinnamon." },
     ],

@@ -20,7 +20,7 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Cooking Agent — Hands off. Hands on dinner.",
+  title: "Cooking Agent: Hands off. Hands on dinner.",
   description:
     "A voice-first cooking assistant for fitness-focused home cooks. Talk through high-protein recipes step by step while your hands stay busy.",
 };
