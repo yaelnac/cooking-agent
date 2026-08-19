@@ -31,6 +31,14 @@ function CookPageInner() {
     }
   }, [status, router]);
 
+  // Recipes are chosen on the homepage; /cook without a valid slug has
+  // nothing to show, so send the visitor back to the menu.
+  useEffect(() => {
+    if (!recipe) {
+      router.replace('/');
+    }
+  }, [recipe, router]);
+
   // The voice session starts only when the user taps "Start" — never on page
   // load — so landing on /cook (with or without a slug) spends no tokens.
   const handleStart = useCallback(async () => {

@@ -135,22 +135,41 @@ function mealForHour(hour: number): RecipeCategory {
 
 const emptySubscribe = () => () => {};
 
+// The homepage decides dinner. A hungry, decision-tired visitor gets ONE
+// recommended dish for this mealtime with one big CTA; rejecting it costs one
+// tap ("show me another"), exploring costs one scroll (the full menu below).
 export function HomeView() {
-  const [category, setCategory] = useState<RecipeCategory>('Breakfast');
-  const { status } = useConversationStatus();
   const router = useRouter();
 
-  const filtered = useMemo(
-    () => RECIPES.filter((r) => r.category === category),
-    [category],
+  // Mealtime from the visitor's clock (null during the static prerender).
+  const meal = useSyncExternalStore(
+    emptySubscribe,
+    () => mealForHour(new Date().getHours()),
+    () => null,
   );
 
-  const quickPicks = useMemo(
+  // The menu tab follows mealtime until the user picks one themselves.
+  const [chosenCategory, setChosenCategory] = useState<RecipeCategory | null>(
+    null,
+  );
+  const category = chosenCategory ?? meal ?? 'Breakfast';
+
+  // This meal's dishes, quickest first. The pick starts at the fastest and
+  // "show me another" walks down the list, wrapping around.
+  const mealList = useMemo(() => {
+    const pool = meal ? RECIPES.filter((r) => r.category === meal) : RECIPES;
+    return [...pool].sort((a, b) => a.minutes - b.minutes);
+  }, [meal]);
+  const [pickIndex, setPickIndex] = useState(0);
+  const pick = mealList[pickIndex % Math.max(mealList.length, 1)];
+
+  // Quickest first — the same priority a hungry person sorts by mentally.
+  const filtered = useMemo(
     () =>
-      RECIPES.filter((r) => r.minutes <= 5).sort(
+      RECIPES.filter((r) => r.category === category).sort(
         (a, b) => a.minutes - b.minutes,
       ),
-    [],
+    [category],
   );
 
   const counts = useMemo(() => {
@@ -162,76 +181,169 @@ export function HomeView() {
   }, []);
 
   const handleStart = useCallback(
-    (recipe?: Recipe) => {
-      // Navigate to the recipe's own link; /cook starts the voice session
-      // from the slug so the agent always has that recipe's steps.
-      router.push(recipe ? `${COOKING_PATH}?slug=${recipe.slug}` : COOKING_PATH);
+    (recipe: Recipe) => {
+      router.push(`${COOKING_PATH}?slug=${recipe.slug}`);
     },
     [router],
   );
 
-  const openCooking = useCallback(() => {
-    router.push(COOKING_PATH);
-  }, [router]);
-
   return (
     <div className="flex flex-col">
-      <Hero onTap={openCooking} status={status} />
-      <QuickPicks recipes={quickPicks} onPick={handleStart} />
-      <div className="mx-auto w-full max-w-6xl px-5 md:px-8">
-        <WaveDivider className="mx-auto h-2.5 w-full max-w-md text-line opacity-70" />
-      </div>
+      {/* slim chrome: who we are on the left, why we exist on the right */}
+      <header className="relative z-10 mx-auto flex w-full max-w-6xl items-center justify-between px-5 pt-5 md:px-8">
+        <span className="font-display text-base tracking-tight text-ink">
+          Tap. Talk. <span className="italic text-terracotta">Cook.</span>
+        </span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint">
+          Hands-free · high-protein
+        </span>
+      </header>
+
+      {/* split hero: the question on the left, the answer on the right —
+          and the menu starts right below, peeking above the fold */}
+      {pick && (
+        <section className="relative overflow-hidden">
+          <span
+            aria-hidden
+            className="pointer-events-none absolute right-[15%] top-[-60px] -z-0 h-72 w-72 rounded-full bg-butter/55 blur-3xl"
+          />
+          <span
+            aria-hidden
+            className="pointer-events-none absolute left-[8%] top-[45%] -z-0 h-56 w-56 rounded-full bg-terracotta/10 blur-3xl"
+          />
+
+          <div className="relative mx-auto grid w-full max-w-6xl items-center gap-8 px-5 pb-10 pt-8 md:px-8 lg:grid-cols-2 lg:gap-14 lg:pb-14 lg:pt-12">
+            <div className="flex flex-col items-start text-left">
+              <h1 className="font-display text-[34px] leading-[1.05] tracking-tight text-ink md:text-[46px]">
+                {meal ? MEAL_HEADLINES[meal] : 'What are we cooking?'}
+              </h1>
+              <p className="mt-3 max-w-md text-[15px] leading-relaxed text-ink-soft">
+                Pick a dish and cook it hands-free — I’ll read every step
+                aloud and wait for you.
+              </p>
+              <HowItWorks />
+            </div>
+
+            <PickCard
+              meal={meal}
+              recipe={pick}
+              isFastest={pickIndex % mealList.length === 0}
+              onCook={() => handleStart(pick)}
+              onAnother={() => setPickIndex((i) => i + 1)}
+            />
+          </div>
+        </section>
+      )}
+
       <BrowseAll
         category={category}
         counts={counts}
         recipes={filtered}
-        onChangeCategory={setCategory}
+        onChangeCategory={setChosenCategory}
         onPick={handleStart}
       />
     </div>
   );
 }
 
-function Hero({ onTap, status }: { onTap: () => void; status: string }) {
-  const isConnecting = status === 'connecting';
-
+// One dish, one CTA — a grounded card, not a floating dialog. Rerolling
+// lives inside the card, right next to the thing it replaces.
+function PickCard({
+  meal,
+  recipe,
+  isFastest,
+  onCook,
+  onAnother,
+}: {
+  meal: RecipeCategory | null;
+  recipe: Recipe;
+  isFastest: boolean;
+  onCook: () => void;
+  onAnother: () => void;
+}) {
+  const pickLabel =
+    meal === 'Dinner'
+      ? 'Tonight’s pick'
+      : meal
+      ? `${meal} pick`
+      : 'Our pick';
   return (
-    <section className="relative overflow-hidden">
-      <span
-        aria-hidden
-        className="pointer-events-none absolute left-1/2 top-[55%] -z-0 h-[420px] w-[420px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-butter/55 blur-3xl"
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute left-[28%] top-[70%] -z-0 h-56 w-56 -translate-x-1/2 rounded-full bg-terracotta/12 blur-3xl"
-      />
-      <span
-        aria-hidden
-        className="pointer-events-none absolute right-[24%] top-[30%] -z-0 h-48 w-48 rounded-full bg-forest/10 blur-3xl"
-      />
-
-      <div className="relative mx-auto flex w-full max-w-3xl flex-col items-center gap-5 px-5 py-12 text-center md:gap-6 md:py-16">
-        <h1 className="font-display text-[28px] leading-tight tracking-tight md:text-[38px]">
-          Tap. Talk.{' '}
-          <span className="relative inline-block italic text-terracotta">
-            Cook.
-          </span>
-        </h1>
-
-        <IdleOrb onTap={onTap} loading={isConnecting} />
-
-        {isConnecting ? (
-          <p className="text-sm text-ink-faint">Opening the kitchen...</p>
-        ) : (
-          <p className="max-w-xs text-sm leading-relaxed text-ink-faint">
-            Pick a dish and cook it hands-free.{' '}
-            <span className="font-display italic text-ink-soft">
-              Every step, read aloud at your pace.
-            </span>
-          </p>
-        )}
+    <div
+      key={recipe.slug}
+      className="anim-step-in w-full rounded-3xl border border-line bg-paper/90 p-6 shadow-[0_32px_70px_-40px_rgba(26,20,16,0.5)] backdrop-blur md:p-7"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.22em] text-terracotta">
+          {pickLabel}
+          {isFastest ? ' · fastest' : ''}
+        </span>
+        <button
+          onClick={onAnother}
+          className="flex shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-line bg-cream/50 px-2.5 py-1 text-xs font-medium text-ink-soft transition hover:border-ink-faint hover:text-ink"
+        >
+          <RefreshIcon className="h-3 w-3" />
+          Another
+        </button>
       </div>
-    </section>
+
+      <h2 className="mt-3 font-display text-[26px] leading-tight tracking-tight text-ink md:text-3xl">
+        {recipe.name}
+      </h2>
+      <p className="mt-1.5 text-sm italic text-ink-soft">“{recipe.angle}.”</p>
+
+      <div className="mt-4 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[13px] text-ink-soft">
+        <span className="flex items-center gap-1.5">
+          <ClockIcon className="h-3.5 w-3.5 text-ink-faint" />
+          {recipe.minutes} min
+        </span>
+        <span aria-hidden className="text-ink-faint/60">
+          ·
+        </span>
+        <span className="font-semibold text-forest">
+          {recipe.protein[0]}–{recipe.protein[1]}g protein
+        </span>
+        <span aria-hidden className="text-ink-faint/60">
+          ·
+        </span>
+        <span>
+          {recipe.calories[0]}–{recipe.calories[1]} kcal
+        </span>
+      </div>
+
+      <button
+        onClick={onCook}
+        className="mt-5 flex w-full cursor-pointer items-center justify-center gap-2.5 rounded-full bg-terracotta px-6 py-3.5 text-[15px] font-semibold text-paper shadow-[0_22px_44px_-16px_rgba(223,98,56,0.8)] transition hover:bg-terracotta-deep"
+      >
+        <MicIcon className="h-4.5 w-4.5" />
+        Cook this with me
+      </button>
+      <p className="mt-2.5 text-center text-[11px] leading-relaxed text-ink-faint">
+        Ingredient check first — the mic stays off until you start.
+      </p>
+    </div>
+  );
+}
+
+// The whole product in one quiet line — a mental model for first-timers,
+// invisible to everyone rushing past it.
+function HowItWorks() {
+  const beats = ['Pick a dish', 'Gather ingredients', 'Cook by voice'];
+  return (
+    <div className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1.5">
+      {beats.map((beat, i) => (
+        <span key={beat} className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5 text-xs text-ink-faint">
+            <span className="grid h-5 w-5 place-items-center rounded-full border border-line bg-paper font-mono text-[10px] font-semibold text-ink-soft">
+              {i + 1}
+            </span>
+            {beat}
+          </span>
+          {i < beats.length - 1 && (
+            <ArrowIcon aria-hidden className="h-3 w-3 text-ink-faint/50" />
+          )}
+        </span>
+      ))}
+    </div>
   );
 }
 
@@ -490,15 +602,10 @@ export function CookingView({
   const ingredientsReady = session.ingredients.filter((i) => i.checked).length;
   const ingredientsTotal = session.ingredients.length;
 
-  // No open mic anymore: without a chosen recipe there's nothing to cook yet,
-  // so this route becomes a guided choice — pick a dish, then start.
+  // Choosing happens on the homepage — /cook without a recipe just goes
+  // there (the page-level effect redirects; render nothing meanwhile).
   if (!initialRecipe) {
-    return (
-      <RecipeChooser
-        onPick={(r) => router.push(`${COOKING_PATH}?slug=${r.slug}`)}
-        onBack={() => router.push('/')}
-      />
-    );
+    return null;
   }
 
   // Before the voice session connects, the page is a calm "ready room" — no
@@ -1264,182 +1371,6 @@ function TimerRow({
   );
 }
 
-function QuickPicks({
-  recipes,
-  onPick,
-}: {
-  recipes: Recipe[];
-  onPick: (r: Recipe) => void;
-}) {
-  const scrollerRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number | null>(null);
-  const [progress, setProgress] = useState(0);
-  const [viewRatio, setViewRatio] = useState(1);
-  const [atStart, setAtStart] = useState(true);
-  const [atEnd, setAtEnd] = useState(true);
-
-  const sync = useCallback(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const max = el.scrollWidth - el.clientWidth;
-    const left = el.scrollLeft;
-    setProgress(max > 4 ? Math.min(1, Math.max(0, left / max)) : 0);
-    setViewRatio(el.scrollWidth > 0 ? el.clientWidth / el.scrollWidth : 1);
-    setAtStart(left <= 4);
-    setAtEnd(left >= max - 4);
-  }, []);
-
-  const onScroll = useCallback(() => {
-    if (rafRef.current !== null) return;
-    rafRef.current = window.requestAnimationFrame(() => {
-      rafRef.current = null;
-      sync();
-    });
-  }, [sync]);
-
-  useEffect(() => {
-    sync();
-    window.addEventListener('resize', sync);
-    return () => {
-      window.removeEventListener('resize', sync);
-      if (rafRef.current !== null) window.cancelAnimationFrame(rafRef.current);
-    };
-  }, [sync]);
-
-  const nudge = useCallback((dir: 1 | -1) => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' });
-  }, []);
-
-  const hasOverflow = viewRatio < 0.995;
-  const thumbWidth = Math.max(14, viewRatio * 100);
-
-  return (
-    <section>
-      <div className="mx-auto w-full max-w-6xl px-5 pb-11 mt-12 pt-2 md:px-8 md:pb-16">
-        <div className="mb-5 flex items-end justify-between gap-4 md:mb-7">
-          <div className="min-w-0">
-            <h2 className="font-display text-2xl tracking-tight md:text-3xl">
-              Need it{' '}
-              <span className="relative inline-block italic text-terracotta">
-                fast
-              </span>
-              ?
-            </h2>
- 
-          </div>
-          {hasOverflow && (
-            <div className="hidden shrink-0 items-center gap-2 md:flex">
-              <CarouselButton dir={-1} disabled={atStart} onClick={() => nudge(-1)} />
-              <CarouselButton dir={1} disabled={atEnd} onClick={() => nudge(1)} />
-            </div>
-          )}
-        </div>
-
-        <div className="relative -mx-5 md:mx-0">
-          <div
-            aria-hidden
-            className={`pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-cream to-transparent transition-opacity duration-300 md:w-16 ${
-              atStart ? 'opacity-0' : 'opacity-100'
-            }`}
-          />
-          <div
-            aria-hidden
-            className={`pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-cream to-transparent transition-opacity duration-300 md:w-20 ${
-              atEnd ? 'opacity-0' : 'opacity-100'
-            }`}
-          />
-
-          <div
-            ref={scrollerRef}
-            onScroll={onScroll}
-            className="no-scrollbar flex snap-x snap-mandatory gap-4 overflow-x-auto scroll-px-5 px-5 pb-3 pt-1 md:scroll-px-0 md:px-0"
-          >
-            {recipes.map((r, i) => (
-              <div
-                key={r.slug}
-                data-card
-                className="anim-fade-up min-w-[78%] max-w-[78%] snap-start sm:min-w-[46%] sm:max-w-[46%] md:min-w-[31%] md:max-w-[31%] lg:min-w-[calc((100%-4rem)/4.5)] lg:max-w-[calc((100%-4rem)/4.5)]"
-                style={{ animationDelay: `${Math.min(i, 6) * 45}ms` }}
-              >
-                <QuickPickCard recipe={r} onPick={() => onPick(r)} />
-              </div>
-            ))}
-            <div aria-hidden className="-ml-4 w-5 shrink-0 md:hidden" />
-          </div>
-        </div>
-
-      </div>
-    </section>
-  );
-}
-
-function CarouselButton({
-  dir,
-  disabled,
-  onClick,
-}: {
-  dir: 1 | -1;
-  disabled: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={dir === 1 ? 'Show more recipes' : 'Show previous recipes'}
-      className="grid h-9 w-9 place-items-center rounded-full border border-line bg-paper text-ink-soft transition enabled:cursor-pointer enabled:hover:-translate-y-0.5 enabled:hover:border-ink-faint enabled:hover:text-ink enabled:hover:shadow-sm disabled:opacity-30"
-    >
-      <ArrowIcon className={`h-4 w-4 ${dir === -1 ? 'rotate-180' : ''}`} />
-    </button>
-  );
-}
-
-function QuickPickCard({ recipe, onPick }: { recipe: Recipe; onPick: () => void }) {
-  const accent = categoryAccent(recipe.category);
-  return (
-    <button
-      onClick={onPick}
-      className="group relative flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-2xl border border-line bg-paper text-left transition hover:-translate-y-1 hover:border-ink-faint hover:shadow-[0_24px_45px_-30px_rgba(26,20,16,0.4)]"
-    >
-      <div className={`h-1 w-full ${accent.bar}`} />
-      <div className="flex flex-1 flex-col gap-3 p-4">
-        <div className="flex items-center justify-between gap-2">
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${accent.chip}`}>
-            {recipe.category}
-          </span>
-          <span className="flex items-center gap-1 rounded-full bg-cream px-2 py-0.5 font-mono text-[10px] font-medium text-ink-soft">
-            <ClockIcon className="h-3 w-3" />
-            {recipe.minutes} min
-          </span>
-        </div>
-        <h3 className="font-display text-lg leading-tight tracking-tight">
-          {recipe.name}
-        </h3>
-        <p className="flex-1 text-sm leading-relaxed text-ink-soft">
-          {recipe.angle}
-        </p>
-        <div className="flex items-end justify-between border-t border-line pt-3">
-          <span className="flex flex-col">
-            <span className="text-[10px] uppercase tracking-wide text-ink-faint">
-              Protein
-            </span>
-            <span className="font-display text-2xl leading-none tracking-tight text-forest">
-              {recipe.protein[0]}&ndash;{recipe.protein[1]}
-              <span className="ml-0.5 text-xs font-medium text-forest/70">g</span>
-            </span>
-          </span>
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-cream text-ink transition group-hover:bg-terracotta group-hover:text-paper">
-            <ArrowIcon className="h-4 w-4" />
-          </span>
-        </div>
-      </div>
-    </button>
-  );
-}
-
 function BrowseAll({
   category,
   counts,
@@ -1465,20 +1396,26 @@ function BrowseAll({
             .
           </h2>
           <span className="text-[11px] uppercase tracking-[0.18em] text-ink-faint">
-            {Object.values(counts).reduce((a, b) => a + b, 0)} recipes
+            {Object.values(counts).reduce((a, b) => a + b, 0)} recipes ·
+            quickest first
           </span>
         </div>
 
         <CategoryTabs active={category} counts={counts} onChange={onChangeCategory} />
 
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {/* same row grammar as the hero pick — one visual language to learn */}
+        <div className="mt-6 grid grid-cols-1 gap-2.5 lg:grid-cols-2 lg:gap-x-5">
           {recipes.map((r, i) => (
             <div
               key={r.slug}
               className="anim-fade-up"
-              style={{ animationDelay: `${i * 20}ms` }}
+              style={{ animationDelay: `${Math.min(i, 8) * 25}ms` }}
             >
-              <RecipeCard recipe={r} onPick={() => onPick(r)} />
+              <ChooserRecipeRow
+                recipe={r}
+                badge={i === 0 ? 'Fastest' : undefined}
+                onPick={() => onPick(r)}
+              />
             </div>
           ))}
         </div>
@@ -1525,240 +1462,8 @@ function CategoryTabs({
   );
 }
 
-function RecipeCard({ recipe, onPick }: { recipe: Recipe; onPick: () => void }) {
-  const accent = categoryAccent(recipe.category);
-  return (
-    <button
-      onClick={onPick}
-      className="group relative flex h-full w-full cursor-pointer flex-col overflow-hidden rounded-3xl border border-line bg-paper text-left transition hover:-translate-y-0.5 hover:border-ink-faint hover:shadow-[0_20px_40px_-25px_rgba(26,20,16,0.3)]"
-    >
-      <div className={`h-1.5 w-full ${accent.bar}`} />
-      <div className="flex flex-1 flex-col gap-3 p-5">
-        <div className="flex items-center justify-between">
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${accent.chip}`}>
-            {recipe.category}
-          </span>
-          <span className="font-mono text-[11px] text-ink-faint">
-            ~{recipe.minutes} min
-          </span>
-        </div>
-
-        <h3 className="font-display text-xl leading-tight tracking-tight">
-          {recipe.name}
-        </h3>
-        <p className="text-sm italic text-ink-soft">&ldquo;{recipe.angle}.&rdquo;</p>
-
-        <div className="mt-auto flex items-end justify-between gap-3 border-t border-line pt-4">
-          <div className="flex flex-col">
-            <span className="text-[10px] uppercase tracking-wide text-ink-faint">
-              Protein
-            </span>
-            <span className="font-display text-2xl leading-none tracking-tight text-forest">
-              {recipe.protein[0]}&ndash;{recipe.protein[1]}
-              <span className="ml-0.5 text-xs font-medium text-forest/70">g</span>
-            </span>
-          </div>
-          <div className="flex flex-col text-right">
-            <span className="text-[10px] uppercase tracking-wide text-ink-faint">
-              kcal
-            </span>
-            <span className="font-display text-2xl leading-none tracking-tight text-ink">
-              {recipe.calories[0]}&ndash;{recipe.calories[1]}
-            </span>
-          </div>
-          <span className="grid h-9 w-9 shrink-0 place-items-center self-center rounded-full bg-cream text-ink transition group-hover:bg-terracotta group-hover:text-paper">
-            <ArrowIcon className="h-4 w-4" />
-          </span>
-        </div>
-      </div>
-    </button>
-  );
-}
-
-function categoryAccent(c: RecipeCategory) {
-  switch (c) {
-    case 'Breakfast':
-      return { bar: 'bg-butter-deep', chip: 'bg-butter text-ink' };
-    case 'Lunch':
-      return { bar: 'bg-forest', chip: 'bg-forest-soft text-forest' };
-    case 'Dinner':
-      return { bar: 'bg-terracotta', chip: 'bg-terracotta-soft text-terracotta-deep' };
-    case 'Snacks':
-      return { bar: 'bg-ink', chip: 'bg-cream text-ink border border-line' };
-  }
-}
-
-function IdleOrb({ onTap, loading }: { onTap: () => void; loading: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onTap}
-      disabled={loading}
-      aria-label="Start cooking with voice"
-      className="relative z-10 grid h-44 w-44 place-items-center enabled:cursor-pointer disabled:cursor-wait md:h-52 md:w-52"
-    >
-      <span
-        className="absolute inset-0 rounded-full bg-terracotta/15"
-        style={{ animation: 'orb-breathe 3.6s ease-in-out infinite' }}
-      />
-      <span
-        className="absolute inset-3 rounded-full bg-terracotta/25"
-        style={{ animation: 'orb-pulse 2.4s ease-in-out infinite' }}
-      />
-      <span className="absolute inset-7 rounded-full bg-gradient-to-br from-terracotta to-terracotta-deep shadow-[0_18px_40px_-12px_rgba(223,98,56,0.55)]" />
-      <span className="relative z-10 flex flex-col items-center gap-1 text-paper">
-        <MicIcon className="h-7 w-7" />
-        <span className="text-[13px] font-medium tracking-wide">
-          {loading ? 'Connecting…' : 'Tap to cook'}
-        </span>
-      </span>
-    </button>
-  );
-}
-
-// One decision per screen: /cook without a dish shows three recipes that fit
-// the hour (fastest first, flagged) — a confident default instead of an open
-// mic and a blank stare. "Browse the full menu" expands right here, in place:
-// the journey only ever moves forward (choose → gather → cook), never back
-// out to the homepage.
-function RecipeChooser({
-  onPick,
-  onBack,
-}: {
-  onPick: (recipe: Recipe) => void;
-  onBack: () => void;
-}) {
-  // Mealtime comes from the visitor's clock, which the static prerender
-  // can't know — so the server snapshot is null and the client fills it in.
-  const meal = useSyncExternalStore(
-    emptySubscribe,
-    () => mealForHour(new Date().getHours()),
-    () => null,
-  );
-
-  // null = the short list; a category = the full menu, opened on that tab.
-  const [browseCategory, setBrowseCategory] = useState<RecipeCategory | null>(
-    null,
-  );
-  const browsing = browseCategory !== null;
-
-  const featured = useMemo(() => {
-    const pool = meal ? RECIPES.filter((r) => r.category === meal) : RECIPES;
-    return [...pool].sort((a, b) => a.minutes - b.minutes).slice(0, 3);
-  }, [meal]);
-
-  const counts = useMemo(() => {
-    const map: Record<RecipeCategory, number> = {
-      Breakfast: 0, Lunch: 0, Dinner: 0, Snacks: 0,
-    };
-    for (const r of RECIPES) map[r.category]++;
-    return map;
-  }, []);
-
-  const browseList = useMemo(() => {
-    if (!browseCategory) return [];
-    return RECIPES.filter((r) => r.category === browseCategory).sort(
-      (a, b) => a.minutes - b.minutes,
-    );
-  }, [browseCategory]);
-
-  return (
-    <div className="relative flex min-h-screen flex-col">
-      {/* ambient warmth — matches the home & ready-room pages */}
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0 overflow-hidden"
-      >
-        <span className="absolute left-1/2 top-[-70px] h-[360px] w-[360px] -translate-x-1/2 rounded-full bg-butter/55 blur-3xl" />
-        <span className="absolute right-[-90px] top-[180px] h-72 w-72 rounded-full bg-terracotta/12 blur-3xl" />
-        <span className="absolute left-[-90px] top-[540px] h-72 w-72 rounded-full bg-forest/10 blur-3xl" />
-      </div>
-
-      {/* top bar */}
-      <div className="relative z-10 px-5 pt-5 lg:px-8">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <button
-            onClick={onBack}
-            aria-label="Back to recipes"
-            className="flex items-center gap-1.5 rounded-full border border-line bg-paper/80 py-1.5 pl-2 pr-3.5 text-xs font-medium text-ink-soft backdrop-blur transition hover:border-ink-faint hover:text-ink"
-          >
-            <ArrowIcon className="h-3.5 w-3.5 rotate-180" />
-            Back
-          </button>
-          <span className="flex items-center gap-1.5 rounded-full bg-paper/80 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-ink-faint backdrop-blur">
-            <span className="h-1.5 w-1.5 rounded-full bg-terracotta" />
-            Voice cook-along
-          </span>
-        </div>
-      </div>
-
-      <div className="relative z-10 mx-auto my-auto flex w-full max-w-xl flex-col items-center px-5 py-10">
-        <ReadyOrb starting={false} size="h-24 w-24 lg:h-28 lg:w-28" />
-
-        <span className="mt-7 text-[11px] font-semibold uppercase tracking-[0.24em] text-terracotta">
-          {meal ? `${meal} time` : 'Ready when you are'}
-        </span>
-        <h1 className="mt-2 text-center font-display text-[32px] leading-[1.07] tracking-tight text-ink md:text-[40px]">
-          {meal ? MEAL_HEADLINES[meal] : 'What are we cooking?'}
-        </h1>
-        <p className="mt-3 max-w-[22rem] text-center text-sm leading-relaxed text-ink-soft lg:text-[15px]">
-          Pick a dish — I’ll read every step aloud while your hands do the
-          work.
-        </p>
-
-        {!browsing ? (
-          <>
-            <ul className="mt-8 flex w-full flex-col gap-2.5">
-              {featured.map((r, i) => (
-                <li
-                  key={r.slug}
-                  className="anim-fade-up"
-                  style={{ animationDelay: `${i * 60}ms` }}
-                >
-                  <ChooserRecipeRow
-                    recipe={r}
-                    badge={i === 0 ? 'Fastest' : undefined}
-                    onPick={() => onPick(r)}
-                  />
-                </li>
-              ))}
-            </ul>
-
-            <button
-              onClick={() => setBrowseCategory(meal ?? 'Dinner')}
-              className="mt-6 flex cursor-pointer items-center gap-1.5 rounded-full px-4 py-2 text-sm font-medium text-ink-soft transition hover:text-ink"
-            >
-              Browse the full menu
-              <ChevronIcon className="h-3.5 w-3.5 rotate-180" />
-            </button>
-          </>
-        ) : (
-          <div className="anim-fade-up mt-8 flex w-full flex-col items-center gap-4">
-            <CategoryTabs
-              active={browseCategory}
-              counts={counts}
-              onChange={setBrowseCategory}
-            />
-            <ul className="flex w-full flex-col gap-2.5">
-              {browseList.map((r, i) => (
-                <li
-                  key={r.slug}
-                  className="anim-fade-up"
-                  style={{ animationDelay: `${Math.min(i, 6) * 40}ms` }}
-                >
-                  <ChooserRecipeRow recipe={r} onPick={() => onPick(r)} />
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
 // A dish as one glanceable, tappable row: name, its one-line pitch, and the
-// two facts the choice actually turns on — minutes and protein.
+// facts the choice actually turns on — protein, minutes, kcal.
 function ChooserRecipeRow({
   recipe,
   badge,
@@ -1788,13 +1493,13 @@ function ChooserRecipeRow({
           {recipe.angle}
         </span>
       </div>
-      <div className="flex shrink-0 flex-col items-end gap-0.5 text-[13px]">
-        <span className="flex items-center gap-1 text-ink-soft">
-          <ClockIcon className="h-3.5 w-3.5" />
-          {recipe.minutes} min
-        </span>
-        <span className="font-semibold text-forest">
+      <div className="flex shrink-0 flex-col items-end gap-0.5">
+        <span className="text-[13px] font-semibold text-forest">
           {recipe.protein[0]}–{recipe.protein[1]}g protein
+        </span>
+        <span className="flex items-center gap-1 text-xs text-ink-soft">
+          <ClockIcon className="h-3 w-3 text-ink-faint" />
+          {recipe.minutes} min · {recipe.calories[0]}–{recipe.calories[1]} kcal
         </span>
       </div>
       <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-cream text-ink transition group-hover:bg-terracotta group-hover:text-paper">
@@ -2245,6 +1950,20 @@ function ArrowIcon({ className }: { className?: string }) {
   );
 }
 
+function RefreshIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
+      <path
+        d="M20 12a8 8 0 1 1-2.34-5.66M20 4v4h-4"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function ChevronIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
@@ -2300,25 +2019,6 @@ function XIcon({ className }: { className?: string }) {
         d="M6 6l12 12M18 6 6 18"
         stroke="currentColor"
         strokeWidth="2"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function WaveDivider({ className }: { className?: string }) {
-  return (
-    <svg
-      aria-hidden
-      viewBox="0 0 200 10"
-      preserveAspectRatio="none"
-      className={className ?? ''}
-      fill="none"
-    >
-      <path
-        d="M0 5 Q 25 1 50 5 T 100 5 T 150 5 T 200 5"
-        stroke="currentColor"
-        strokeWidth="1.5"
         strokeLinecap="round"
       />
     </svg>
