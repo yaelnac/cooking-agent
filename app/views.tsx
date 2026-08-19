@@ -1525,21 +1525,28 @@ function ReadyRoom({
 
   const hero = (
     <header className="anim-rise flex flex-col items-center text-center">
-      <ReadyOrb starting={starting} />
+      <ReadyOrb
+        starting={starting}
+        size={recipe ? 'h-32 w-32 lg:h-36 lg:w-36' : 'h-36 w-36 lg:h-44 lg:w-44'}
+      />
 
       {recipe && (
-        <span className="mt-8 text-[11px] font-semibold uppercase tracking-[0.24em] text-ink-faint">
-          Voice cook-along
+        <span className="mt-6 text-[11px] font-semibold uppercase tracking-[0.24em] text-terracotta">
+          {recipe.angle}
         </span>
       )}
 
       <h1
-        className={`${recipe ? 'mt-3' : 'mt-8'} font-display text-[34px] leading-[1.07] tracking-tight text-ink md:text-[42px] lg:text-[46px]`}
+        className={`font-display leading-[1.07] tracking-tight text-ink ${
+          recipe
+            ? 'mt-2 text-[30px] md:text-[36px] lg:text-[38px]'
+            : 'mt-8 text-[34px] md:text-[42px] lg:text-[46px]'
+        }`}
       >
         {recipe ? recipe.name : 'What should we cook?'}
       </h1>
 
-      <p className="mt-4 max-w-[20rem] text-sm leading-relaxed text-ink-soft lg:text-[15px]">
+      <p className="mt-3 max-w-[20rem] text-sm leading-relaxed text-ink-soft lg:text-[15px]">
         {recipe
           ? 'I read every step out loud and wait for you, so your hands stay in the bowl, not on the screen.'
           : "Say what you're craving. I'll turn it into a recipe and talk you through it, step by step."}
@@ -1568,24 +1575,23 @@ function ReadyRoom({
       )}
 
       {recipe && (
-        <div className="mt-8 grid w-full max-w-sm grid-cols-4 gap-2">
-          <StatTile label="Time" value={`${recipe.minutes}`} unit="min" />
-          <StatTile
-            label="Steps"
-            value={`${steps.length}`}
-            unit={steps.length === 1 ? 'step' : 'steps'}
-          />
-          <StatTile
-            label="Protein"
-            value={`${recipe.protein[0]}–${recipe.protein[1]}`}
-            unit="g protein"
-            tone="forest"
-          />
-          <StatTile
-            label="Energy"
-            value={`${recipe.calories[0]}–${recipe.calories[1]}`}
-            unit="kcal"
-          />
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-2.5 gap-y-1.5 text-[13px] text-ink-soft">
+          <span className="flex items-center gap-1.5">
+            <ClockIcon className="h-3.5 w-3.5 text-ink-faint" />
+            {recipe.minutes} min
+          </span>
+          <span aria-hidden className="text-ink-faint/60">
+            ·
+          </span>
+          <span className="font-semibold text-forest">
+            {recipe.protein[0]}–{recipe.protein[1]}g protein
+          </span>
+          <span aria-hidden className="text-ink-faint/60">
+            ·
+          </span>
+          <span>
+            {recipe.calories[0]}–{recipe.calories[1]} kcal
+          </span>
         </div>
       )}
     </header>
@@ -1594,17 +1600,17 @@ function ReadyRoom({
   const ingredientsCard =
     recipe && ingredients.length > 0 ? (
       <section
-        className="anim-rise rounded-3xl border border-line bg-paper/80 p-5 shadow-[0_22px_55px_-44px_rgba(26,20,16,0.55)] backdrop-blur lg:p-6"
+        className="anim-rise rounded-3xl border border-line bg-paper/80 p-5 shadow-[0_22px_55px_-44px_rgba(26,20,16,0.55)] backdrop-blur lg:p-4"
         style={{ animationDelay: '90ms' }}
       >
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-col">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-faint">
-              Mise en place
-            </span>
-            <span className="font-display text-lg tracking-tight text-ink">
+            <h2 className="font-display text-lg tracking-tight text-ink">
               Gather your ingredients
-            </span>
+            </h2>
+            <p className="mt-0.5 text-xs leading-relaxed text-ink-faint">
+              Tap each one as it lands on the counter.
+            </p>
           </div>
           <span
             className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
@@ -1614,29 +1620,23 @@ function ReadyRoom({
             {allGathered ? 'All set' : `${gathered} / ${ingredients.length}`}
           </span>
         </div>
-        <p className="mt-1.5 text-xs leading-relaxed text-ink-faint">
-          Set each one on the counter and tap it off. No rush, the voice waits
-          for you.
-        </p>
-        <ul className="mt-3 grid grid-cols-1 gap-1.5 sm:grid-cols-2">
+        <ul className="mt-2.5 grid grid-cols-1 gap-0.5 sm:grid-cols-2 sm:gap-x-5">
           {ingredients.map((it, i) => (
             <li key={`${it.item}-${i}`}>
               <button
                 onClick={() => onToggleIngredient(i)}
-                className={`flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left transition ${
-                  it.checked
-                    ? 'border-forest/30 bg-forest-soft/60'
-                    : 'border-line bg-cream/40 hover:border-ink-faint'
+                className={`flex w-full items-center gap-3 rounded-xl px-2 py-1.5 text-left transition ${
+                  it.checked ? 'bg-forest-soft/50' : 'hover:bg-cream'
                 }`}
               >
                 <span
-                  className={`grid h-6 w-6 shrink-0 place-items-center rounded-full transition ${
+                  className={`grid h-5 w-5 shrink-0 place-items-center rounded-full transition ${
                     it.checked
                       ? 'anim-check-pop bg-forest text-paper'
                       : 'border border-line bg-paper text-transparent'
                   }`}
                 >
-                  <CheckIcon className="h-3.5 w-3.5" />
+                  <CheckIcon className="h-3 w-3" />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span
@@ -1665,16 +1665,22 @@ function ReadyRoom({
   const pathCard =
     recipe && steps.length > 0 ? (
       <section
-        className="anim-rise rounded-3xl border border-line bg-paper/80 p-5 shadow-[0_22px_55px_-44px_rgba(26,20,16,0.55)] backdrop-blur lg:p-6"
+        className="anim-rise rounded-3xl border border-line bg-paper/80 p-5 shadow-[0_22px_55px_-44px_rgba(26,20,16,0.55)] backdrop-blur lg:p-4"
         style={{ animationDelay: '170ms' }}
       >
-        <span className="text-[11px] font-semibold uppercase tracking-[0.2em] text-ink-faint">
-          Step by step
-        </span>
-        <h2 className="mt-1 font-display text-xl tracking-tight text-ink">
+        <h2 className="font-display text-lg tracking-tight text-ink">
           The path ahead
         </h2>
-        <ol className="mt-5 flex flex-col">
+        <p className="mt-0.5 text-xs leading-relaxed text-ink-faint">
+          {steps.length} steps, read aloud one at a time. You set the pace.
+        </p>
+        <ol
+          className={`mt-3 flex flex-col ${
+            steps.length >= 4
+              ? 'lg:grid lg:grid-cols-2 lg:gap-x-6 lg:gap-y-3'
+              : ''
+          }`}
+        >
           {steps.map((s, i) => (
             <li key={i} className="flex items-start gap-3">
               <div className="flex flex-col items-center self-stretch">
@@ -1682,23 +1688,28 @@ function ReadyRoom({
                   {i + 1}
                 </span>
                 {i < steps.length - 1 && (
-                  <span className="my-1 w-px flex-1 bg-line" />
+                  <span
+                    className={`my-1 w-px flex-1 bg-line ${
+                      steps.length >= 4 ? 'lg:hidden' : ''
+                    }`}
+                  />
                 )}
               </div>
               <div
                 className={`flex min-w-0 flex-col ${
-                  i < steps.length - 1 ? 'pb-3.5' : ''
+                  i < steps.length - 1
+                    ? steps.length >= 4
+                      ? 'pb-3 lg:pb-0'
+                      : 'pb-3'
+                    : ''
                 }`}
               >
                 <span className="text-sm font-medium leading-snug text-ink">
                   {s.title}
                 </span>
-                {s.timer && (
-                  <span className="mt-1 flex w-fit items-center gap-1 rounded-full bg-butter/60 px-2 py-0.5 text-[10px] font-medium text-ink-soft">
-                    <ClockIcon className="h-3 w-3" />
-                    {s.timer.label}
-                  </span>
-                )}
+                <span className="mt-0.5 line-clamp-1 text-xs leading-relaxed text-ink-faint">
+                  {s.body}
+                </span>
               </div>
             </li>
           ))}
@@ -1745,15 +1756,15 @@ function ReadyRoom({
       </div>
 
       {recipe ? (
-        <div className="relative z-10 mx-auto w-full max-w-xl px-5 pb-44 pt-8 lg:max-w-6xl lg:px-8 lg:pb-16 lg:pt-12">
+        <div className="relative z-10 mx-auto w-full max-w-xl px-5 pb-44 pt-8 lg:flex lg:max-w-6xl lg:flex-1 lg:flex-col lg:justify-center lg:px-8 lg:pb-8 lg:pt-4">
           <div className="lg:grid lg:grid-cols-12 lg:items-start lg:gap-10">
             {/* identity + action — sticky on desktop */}
             <div className="lg:col-span-5 lg:sticky lg:top-10">
               {hero}
-              <div className="mt-8 hidden lg:block">{startCta}</div>
+              <div className="mt-6 hidden lg:block">{startCta}</div>
             </div>
             {/* the practical detail */}
-            <div className="mt-6 flex flex-col gap-6 lg:col-span-7 lg:mt-0">
+            <div className="mt-6 flex flex-col gap-6 lg:col-span-7 lg:mt-0 lg:gap-3">
               {ingredientsCard}
               {pathCard}
             </div>
@@ -1831,9 +1842,15 @@ function StartCTA({
   );
 }
 
-function ReadyOrb({ starting }: { starting: boolean }) {
+function ReadyOrb({
+  starting,
+  size = 'h-36 w-36 lg:h-44 lg:w-44',
+}: {
+  starting: boolean;
+  size?: string;
+}) {
   return (
-    <div className="anim-float relative grid h-36 w-36 place-items-center lg:h-44 lg:w-44">
+    <div className={`anim-float relative grid place-items-center ${size}`}>
       <span
         className="absolute inset-0 rounded-full bg-terracotta/20"
         style={{ animation: 'ring-ripple 3.6s ease-out infinite' }}
@@ -1863,33 +1880,6 @@ function ReadyOrb({ starting }: { starting: boolean }) {
 }
 
 
-function StatTile({
-  label,
-  value,
-  unit,
-  tone,
-}: {
-  label: string;
-  value: string;
-  unit: string;
-  tone?: 'forest';
-}) {
-  return (
-    <div className="flex flex-col items-center gap-0.5 rounded-2xl border border-line bg-paper/70 px-1 py-2.5">
-      <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
-        {label}
-      </span>
-      <span
-        className={`whitespace-nowrap font-display text-[15px] leading-none tracking-tight ${
-          tone === 'forest' ? 'text-forest' : 'text-ink'
-        }`}
-      >
-        {value}
-      </span>
-      <span className="text-[9px] text-ink-faint">{unit}</span>
-    </div>
-  );
-}
 
 function SoundWaveIcon({ className }: { className?: string }) {
   return (

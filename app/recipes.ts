@@ -308,45 +308,6 @@ export const RECIPES: Recipe[] = [
 
   // Lunch
   {
-    slug: "chicken-rice-bowl",
-    name: "Chicken rice power bowl",
-    category: "Lunch",
-    angle: "Balanced classic",
-    calories: [500, 700],
-    protein: [40, 55],
-    minutes: 25,
-    tags: ["Meal prep"],
-    ingredients: [
-      { item: "Chicken breast", qty: "200g", note: "cut into bite-size cubes" },
-      { item: "Jasmine rice", qty: "3/4 cup", note: "uncooked" },
-      { item: "Olive oil", qty: "1 tbsp" },
-      { item: "Garlic", qty: "2 cloves", note: "minced" },
-      { item: "Soy sauce", qty: "1 tbsp", note: "low-sodium" },
-      { item: "Cucumber", qty: "1/2", note: "diced" },
-      { item: "Avocado", qty: "1/2", note: "sliced" },
-      { item: "Salt + pepper", qty: "to taste" },
-      { item: "Lime", qty: "1/2", note: "for finishing" },
-    ],
-    steps: [
-      {
-        title: "Start the rice",
-        body: "Rinse the rice until the water runs clear, then add it to a pot with one and a half cups of water and a pinch of salt. Bring to a boil, cover, and lower the heat.",
-        timer: { seconds: 900, label: "Rice simmer" },
-      },
-      { title: "Season the chicken", body: "While the rice cooks, pat the chicken dry, then toss with olive oil, salt, pepper, and half the garlic." },
-      { title: "Heat the pan", body: "Set a large pan over medium-high heat. Let it get hot enough that a drop of water sizzles on contact." },
-      {
-        title: "Sear the chicken",
-        body: "Add the chicken in one layer. Don't move it for ninety seconds, then stir occasionally until golden and cooked through, about six minutes total.",
-        timer: { seconds: 360, label: "Chicken sear" },
-      },
-      { title: "Build the sauce", body: "Lower the heat, add the rest of the garlic and the soy sauce, and toss for thirty seconds until glossy." },
-      { title: "Prep the cold side", body: "While the chicken finishes, dice the cucumber and slice the avocado. Squeeze the lime over both." },
-      { title: "Assemble the bowl", body: "Spoon rice into a wide bowl, lay the chicken on one side, and pile the cucumber and avocado on the other." },
-      { title: "Finish", body: "Top with the remaining lime, a pinch of flaky salt, and a quick crack of black pepper. Done." },
-    ],
-  },
-  {
     slug: "turkey-avocado-wrap",
     name: "Turkey avocado lunch wrap",
     category: "Lunch",
