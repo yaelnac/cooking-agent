@@ -2,6 +2,8 @@
 
 Cook a high-protein meal by talking, not scrolling.
 
+**Live app:** [cooking-agent-nine.vercel.app](https://cooking-agent-nine.vercel.app/)
+
 Cooking Agent is a voice-first cook-along. You pick a recipe, tap start, and a voice walks you through it step by step. It reads a step, waits, and moves on when you say "done." Your hands stay in the bowl.
 
 The screen follows the conversation. The current step highlights itself, ingredients tick off as you gather them, and timers appear when a step needs one. Everything lives in the page — no database, no login, no account.
